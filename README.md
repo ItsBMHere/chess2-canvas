@@ -36,4 +36,5 @@
 	- [ ] Erase piece on hovered-over square on left mouse press
 - [ ] FEN
 	- [ ] Parse FEN2 to board position 
+	- [ ] Parse Fischerrandom to board position by value (as per the [most recent ruleset](https://static1.squarespace.com/static/575f8cb8ab48de461197681a/t/5f2e3acc0fe05d162d2c0834/1596865230951/chess2_rulebook3-0.pdf))
 
