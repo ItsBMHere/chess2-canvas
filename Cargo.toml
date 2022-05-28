@@ -1,0 +1,22 @@
+[package]
+name = "chess2-canvas"
+version = "0.1.0"
+edition = "2021"
+author = "BM"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bevy = {version = "0.7", features = ["render"]}
+bevy_render = "0.7"
+bevy-inspector-egui = "0.11"
+bevy_editor_pls = {git = "https://github.com/jakobhellermann/bevy_editor_pls"}
+bevy_prototype_lyon = "0.5"
+winit = {version = "0.26"}
+image = {version = "0.24"}
+bevy_mod_picking = "0.6"
+bevy_svg = { version = "0.7", default-features = false, features = ["2d"] }
+iyes_loopless = { version = "0.5.1"}
+
+[profile.dev.package."*"]
+opt-level = 3
