@@ -480,7 +480,7 @@ dependencies = [
  "bevy-inspector-egui 0.10.0",
  "bevy_editor_pls_core",
  "bevy_mod_debugdump",
- "bevy_mod_raycast 0.4.0 (git+https://github.com/obsgolem/bevy_mod_raycast?branch=release)",
+ "bevy_mod_raycast",
  "indexmap",
  "opener",
  "pretty-type-name",
@@ -581,6 +581,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy_interact_2d"
+version = "0.5.4"
+dependencies = [
+ "bevy",
+]
+
+[[package]]
 name = "bevy_internal"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -665,25 +672,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bevy_mod_picking"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d1be4bfb7c50e8c0dd471af3cdc0b1cbe18417cbc225b28d6724cf68e7db704"
-dependencies = [
- "bevy",
- "bevy_mod_raycast 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "bevy_mod_raycast"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f197fdb27012bc41a5a0086a784aca78b35aea2a10e38a0ea0f1e5b673ca4cfc"
-dependencies = [
- "bevy",
-]
-
-[[package]]
 name = "bevy_mod_raycast"
 version = "0.4.0"
 source = "git+https://github.com/obsgolem/bevy_mod_raycast?branch=release#9c88ce2695035ff9117e53de3081db4672337711"
@@ -710,17 +698,6 @@ dependencies = [
  "bevy_window",
  "bitflags",
  "bytemuck",
-]
-
-[[package]]
-name = "bevy_prototype_lyon"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a0a902a6ba040d8874fc8798443ccc2f920077ab8d2a869e301b5900bfdbcd66"
-dependencies = [
- "bevy",
- "lyon_tessellation",
- "svgtypes 0.5.0",
 ]
 
 [[package]]
@@ -1155,12 +1132,10 @@ dependencies = [
  "bevy",
  "bevy-inspector-egui 0.11.0",
  "bevy_editor_pls",
- "bevy_mod_picking",
- "bevy_prototype_lyon",
+ "bevy_interact_2d",
  "bevy_render",
  "bevy_svg",
  "image 0.24.2",
- "iyes_loopless",
  "winit",
 ]
 
@@ -2243,18 +2218,6 @@ name = "itoa"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "112c678d4050afce233f4f2852bb2eb519230b3cf12f33585275537d7e41578d"
-
-[[package]]
-name = "iyes_loopless"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e37cbe1fdc9aeed2d5ec064d3306ba4318723c20c5b0e4662d03c49fedcd491b"
-dependencies = [
- "bevy_app",
- "bevy_core",
- "bevy_ecs",
- "bevy_utils",
-]
 
 [[package]]
 name = "jni"

@@ -1,9 +1,14 @@
 
 use bevy::prelude::*;
-use bevy::text::*;
-use iyes_loopless::prelude::*;
-use bevy_svg::prelude::{Svg2dBundle, Origin};
-use bevy::app::StartupStage;
+// use bevy_interact_2d::{
+//     drag::{DragPlugin, Draggable, Dragged},
+//     Group, Interactable, InteractionPlugin, InteractionSource, InteractionState,
+//   };
+
+// const SQUARES_GROUP: u8 = 0;
+// const PIECES_GROUP: u8 = 1;
+
+// use bevy_svg::prelude::{Svg2dBundle, Origin};
 
 #[derive(Component)]
 struct Square;
@@ -61,21 +66,27 @@ impl PieceSize {
     }
 }
 
-
 #[derive(Component)]
-enum Modes {
-    Cursor,
-    Pawn,
-    Knight,
-    Bishop,
-    Rook,
-    Queen,
-    King,
-    Trash,
+struct Highlight {
+    pos: Position,
 }
+
+
+// #[derive(Component)]
+// enum Modes {
+//     Cursor,
+//     Pawn,
+//     Knight,
+//     Bishop,
+//     Rook,
+//     Queen,
+//     King,
+//     Trash,
+// }
 
 const DARK: Color = Color::rgb(0.71, 0.533, 0.388);
 const LIGHT: Color = Color::rgb(0.941, 0.851, 0.71);
+const HIGHLIGHT: Color = Color::rgba(0.227, 0.411, 0.258, 0.2);
 
 const RANKS: &'static str = "12345678";
 const FILES: &'static str = "abcdefgh";
@@ -132,6 +143,10 @@ fn draw_notation(mut commands: Commands, asset_server: Res<AssetServer>) {
 
 fn setup_board(mut commands: Commands) {
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
+    // .insert(InteractionSource {
+    //     groups: vec![Group(SQUARES_GROUP), Group(PIECES_GROUP)],
+    //     ..default()
+    // });
 
     for x in 0..8 {
         for y in 0..8 {
@@ -152,21 +167,12 @@ fn setup_board(mut commands: Commands) {
             .insert(Square)
             .insert(Position {x, y})
             .insert(Size::square(1.));
+            
+            
         }
     }
+    
 }
-
-/*fn draw_piece_dummy(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let svg = asset_server.load("pieces\\a_b.svg");
-    commands.spawn_bundle(Svg2dBundle {
-        svg,
-        origin: Origin::Center,
-        ..default()
-    })
-    .insert(Piece)
-    .insert(Position {x: 4, y: 4})
-    .insert(PieceSize::size(0.75));
-}*/
 
 fn draw_piece_dummy(mut commands: Commands, asset_server: Res<AssetServer>) {
     for x in 0..8 {
@@ -174,6 +180,15 @@ fn draw_piece_dummy(mut commands: Commands, asset_server: Res<AssetServer>) {
             texture: asset_server.load("pieces\\c_p.png"),
             ..default()
         })
+        // .insert(Interactable {
+        //     groups: vec![Group(PIECES_GROUP)],
+        //     bounding_box: (Vec2::new(-12., -12.), Vec2::new(12.,12.)),
+        // })
+        // .insert(Draggable {
+        //     groups: vec![Group(PIECES_GROUP)],
+        //     hook: None,
+        //     ..default()
+        // })
         .insert(Piece)
         .insert(Position {x, y: 6})
         .insert(PieceSize::size(0.67));
@@ -185,10 +200,10 @@ fn draw_piece_dummy(mut commands: Commands, asset_server: Res<AssetServer>) {
         .insert(Piece)
         .insert(Position {x, y: 1})
         .insert(PieceSize::size(0.67));
-
     }
  
 }
+
 
 
 
@@ -256,7 +271,7 @@ fn piece_position_translation(windows: Res<Windows>, mut q: Query<(&Position, &m
         transform.translation = Vec3::new(
             convert(pos.x as f32, window.width() as f32, 8f32),
             convert(pos.y as f32, window.height() as f32, 8f32),
-            2.0,
+            5.0,
         );
     }
 }
@@ -287,6 +302,8 @@ pub struct BoardPlugin;
 impl Plugin for BoardPlugin {
     fn build(&self, app: &mut App) {
         app
+            // .add_plugin(InteractionPlugin)
+            // .add_plugin(DragPlugin)
             .add_startup_system_set(
                 SystemSet::new()
                     .with_system(setup_board.before(draw_midline).before(draw_notation))
