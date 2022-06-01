@@ -1,9 +1,7 @@
 
 use bevy::prelude::*;
-use bevy::text::*;
-use iyes_loopless::prelude::*;
-use bevy_svg::prelude::{Svg2dBundle, Origin};
-use bevy::app::StartupStage;
+use bevy::input::mouse::{MouseMotion, MouseButtonInput};
+use std::ops::{Add, Sub};
 
 #[derive(Component)]
 struct Square;
@@ -20,10 +18,37 @@ enum FilesRanks {
 #[derive(Component)]
 struct Piece;
 
-#[derive(Component, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "debug", derive(bevy_inspector_egui::Inspectable))]
+#[derive(Debug, Default, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Component)]
 struct Position {
     x: i32,
     y: i32,
+}
+impl Add for Position{
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self {
+            x: self.x + rhs.x,
+            y: self.y + rhs.y,
+        }
+    }
+}
+impl Sub for Position {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self {
+            x: self.x.saturating_sub(rhs.x),
+            y: self.y.saturating_sub(rhs.y),
+        }
+    }
+
+}
+impl std::fmt::Display for Position {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {})", self.x, self.y)
+    }
 }
 
 #[derive(Component)]
@@ -59,19 +84,6 @@ impl PieceSize {
             height: x,
         }
     }
-}
-
-
-#[derive(Component)]
-enum Modes {
-    Cursor,
-    Pawn,
-    Knight,
-    Bishop,
-    Rook,
-    Queen,
-    King,
-    Trash,
 }
 
 const DARK: Color = Color::rgb(0.71, 0.533, 0.388);
@@ -281,7 +293,37 @@ fn notation_position_translation(windows: Res<Windows>, mut q: Query<(&Position,
     }
 }
 
+fn cursor_events(
+    windows: Res<Windows>,
+    mut mousebtn_evr: EventReader<MouseButtonInput>,
+    mut cursor_evr: EventReader<CursorMoved>,
+) {
+    use bevy::input::ElementState;
+    let window = windows.get_primary().unwrap();
+    let tile_size = window.width() / 8f32;
+    for ev in cursor_evr.iter() {
+        let cursor_pos = Position {
+            x: (ev.position.x / tile_size) as i32 % 8,
+            y: (ev.position.y / tile_size) as i32 % 8,
+        };
+        println!(
+            "New cursor position: X: {}, Y: {}, in Window ID: {:?}",
+            cursor_pos.x, cursor_pos.y, ev.id
+        );
+    }
 
+    for ev in mousebtn_evr.iter() {
+        match ev.state {
+            ElementState::Pressed => {
+                println!("Mouse button press: {:?}", ev.button);
+            }
+            ElementState::Released => {
+                println!("Mouse button release: {:?}", ev.button);
+            }
+        }
+    }
+
+}
 
 pub struct BoardPlugin;
 impl Plugin for BoardPlugin {
@@ -311,6 +353,7 @@ impl Plugin for BoardPlugin {
                     .after("board_scale")
                     .with_system(notation_position_translation)
             )
+            .add_system_to_stage(CoreStage::PostUpdate, cursor_events)
             .run();
     }
 }
