@@ -121,32 +121,6 @@ fn draw_notation(mut commands: Commands, asset_server: Res<AssetServer>) {
     }
 }
 
-// fn setup_board(mut commands: Commands) {
-//     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
-
-//     for x in 0..8 {
-//         for y in 0..8 {
-//             commands
-//             .spawn_bundle(SpriteBundle {
-//                 sprite: Sprite {
-//                     color: {
-//                         if (x + y + 1) % 2 == 0 {
-//                             LIGHT
-//                         } else {
-//                             DARK
-//                         }
-//                     },
-//                     ..default()
-//                 },
-//                 ..default()
-//             })
-//             .insert(Square)
-//             .insert(Position {x, y})
-//             .insert(Size::square(1.));
-//         }
-//     }
-// }
-
 fn light_or_dark(x: i32, y: i32) -> Color {
     if (x + y + 1) % 2 == 0 {
         LIGHT
