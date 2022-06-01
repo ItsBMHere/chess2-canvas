@@ -1,6 +1,5 @@
 
 use super::*;
-use bevy::input::mouse::MouseButtonInput;
 use bevy::sprite::MaterialMesh2dBundle;
 use bevy_mod_picking::{DefaultPickingPlugins, PickableBundle, PickingCameraBundle, PickingEvent};
 
@@ -303,43 +302,6 @@ fn notation_position_translation(windows: Res<Windows>, mut q: Query<(&Position,
         );
     }
 }
-
-
-fn print_mouse_events(
-    windows: Res<Windows>,
-    mut cursor_event_reader: EventReader<CursorMoved>,
-    mut mouse_press_event_reader: EventReader<MouseButtonInput>,
-) {
-    let window = windows.get_primary().unwrap();
-    let tile_size = window.width() / 8f32;
-    for event in cursor_event_reader.iter() {
-        let coords = event.position.to_array();
-        let pos = Position {
-            x: (coords[0] / tile_size) as i32,
-            y: (coords[1] / tile_size) as i32
-        };
-        println!("Cursor on Position: (x: {}, y: {})", pos.x, pos.y);
-        
-    }
-    for mice in mouse_press_event_reader.iter() {
-        println!("{:?}", mice);
-    }
-}
-
-// fn cursor_position_translation(
-//     windows: Res<Windows>, 
-//     mut cursor_event_reader: EventReader<CursorMoved>,
-// ) {
-//     fn convert(pos: Res<CursorMoved>, bound_window: f32, bound_game: f32) -> (f32, f32) {
-//         let tile_size = bound_window / bound_game;
-//         let coords = pos.position.to_array();
-//         (
-//             coords[0] % tile_size,
-//             coords[1] % tile_size,
-//         )
-//     }
-// }
-
 
 pub struct BoardPlugin;
 impl Plugin for BoardPlugin {
