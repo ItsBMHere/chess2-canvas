@@ -1,9 +1,8 @@
 
-use bevy::prelude::*;
-use bevy::text::*;
-use iyes_loopless::prelude::*;
-use bevy_svg::prelude::{Svg2dBundle, Origin};
-use bevy::app::StartupStage;
+use super::*;
+use bevy::input::mouse::MouseButtonInput;
+use bevy::sprite::MaterialMesh2dBundle;
+use bevy_mod_picking::{DefaultPickingPlugins, PickableBundle, PickingCameraBundle, PickingEvent};
 
 #[derive(Component)]
 struct Square;
@@ -24,6 +23,11 @@ struct Piece;
 struct Position {
     x: i32,
     y: i32,
+}
+impl std::fmt::Display for Position {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {})", self.x, self.y)
+    }
 }
 
 #[derive(Component)]
@@ -61,18 +65,6 @@ impl PieceSize {
     }
 }
 
-
-#[derive(Component)]
-enum Modes {
-    Cursor,
-    Pawn,
-    Knight,
-    Bishop,
-    Rook,
-    Queen,
-    King,
-    Trash,
-}
 
 const DARK: Color = Color::rgb(0.71, 0.533, 0.388);
 const LIGHT: Color = Color::rgb(0.941, 0.851, 0.71);
@@ -130,43 +122,74 @@ fn draw_notation(mut commands: Commands, asset_server: Res<AssetServer>) {
     }
 }
 
-fn setup_board(mut commands: Commands) {
-    commands.spawn_bundle(OrthographicCameraBundle::new_2d());
+// fn setup_board(mut commands: Commands) {
+//     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
+
+//     for x in 0..8 {
+//         for y in 0..8 {
+//             commands
+//             .spawn_bundle(SpriteBundle {
+//                 sprite: Sprite {
+//                     color: {
+//                         if (x + y + 1) % 2 == 0 {
+//                             LIGHT
+//                         } else {
+//                             DARK
+//                         }
+//                     },
+//                     ..default()
+//                 },
+//                 ..default()
+//             })
+//             .insert(Square)
+//             .insert(Position {x, y})
+//             .insert(Size::square(1.));
+//         }
+//     }
+// }
+
+fn light_or_dark(x: i32, y: i32) -> Color {
+    if (x + y + 1) % 2 == 0 {
+        LIGHT
+    } else {
+        DARK
+    }
+}
+
+fn setup_board(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+) {
 
     for x in 0..8 {
         for y in 0..8 {
             commands
-            .spawn_bundle(SpriteBundle {
-                sprite: Sprite {
-                    color: {
-                        if (x + y + 1) % 2 == 0 {
-                            LIGHT
-                        } else {
-                            DARK
-                        }
-                    },
-                    ..default()
-                },
+            .spawn_bundle(MaterialMesh2dBundle {
+                mesh: meshes.add(Mesh::from(shape::Quad::default())).into(),
+                material: materials.add(ColorMaterial::from(light_or_dark(x, y))),
                 ..default()
             })
+            .insert_bundle(PickableBundle::default())
             .insert(Square)
             .insert(Position {x, y})
             .insert(Size::square(1.));
         }
     }
+    commands
+        .spawn_bundle(OrthographicCameraBundle::new_2d())
+        .insert_bundle(PickingCameraBundle::default());
 }
 
-/*fn draw_piece_dummy(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let svg = asset_server.load("pieces\\a_b.svg");
-    commands.spawn_bundle(Svg2dBundle {
-        svg,
-        origin: Origin::Center,
-        ..default()
-    })
-    .insert(Piece)
-    .insert(Position {x: 4, y: 4})
-    .insert(PieceSize::size(0.75));
-}*/
+pub fn print_events(mut events: EventReader<PickingEvent>) {
+    for event in events.iter() {
+        match event {
+            PickingEvent::Selection(e) => info!("A selection event happened: {:?}", e),
+            PickingEvent::Hover(e) => info!("Egads! A hover event!? {:?}", e),
+            PickingEvent::Clicked(e) => info!("Gee Willikers, it's a click! {:?}", e),
+        }
+    }
+}
 
 fn draw_piece_dummy(mut commands: Commands, asset_server: Res<AssetServer>) {
     for x in 0..8 {
@@ -282,11 +305,47 @@ fn notation_position_translation(windows: Res<Windows>, mut q: Query<(&Position,
 }
 
 
+fn print_mouse_events(
+    windows: Res<Windows>,
+    mut cursor_event_reader: EventReader<CursorMoved>,
+    mut mouse_press_event_reader: EventReader<MouseButtonInput>,
+) {
+    let window = windows.get_primary().unwrap();
+    let tile_size = window.width() / 8f32;
+    for event in cursor_event_reader.iter() {
+        let coords = event.position.to_array();
+        let pos = Position {
+            x: (coords[0] / tile_size) as i32,
+            y: (coords[1] / tile_size) as i32
+        };
+        println!("Cursor on Position: (x: {}, y: {})", pos.x, pos.y);
+        
+    }
+    for mice in mouse_press_event_reader.iter() {
+        println!("{:?}", mice);
+    }
+}
+
+// fn cursor_position_translation(
+//     windows: Res<Windows>, 
+//     mut cursor_event_reader: EventReader<CursorMoved>,
+// ) {
+//     fn convert(pos: Res<CursorMoved>, bound_window: f32, bound_game: f32) -> (f32, f32) {
+//         let tile_size = bound_window / bound_game;
+//         let coords = pos.position.to_array();
+//         (
+//             coords[0] % tile_size,
+//             coords[1] % tile_size,
+//         )
+//     }
+// }
+
 
 pub struct BoardPlugin;
 impl Plugin for BoardPlugin {
     fn build(&self, app: &mut App) {
         app
+            .add_plugins(DefaultPickingPlugins)
             .add_startup_system_set(
                 SystemSet::new()
                     .with_system(setup_board.before(draw_midline).before(draw_notation))
@@ -311,6 +370,7 @@ impl Plugin for BoardPlugin {
                     .after("board_scale")
                     .with_system(notation_position_translation)
             )
+            .add_system_to_stage(CoreStage::PostUpdate, print_events)
             .run();
     }
 }
