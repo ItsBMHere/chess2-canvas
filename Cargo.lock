@@ -1161,6 +1161,7 @@ dependencies = [
  "bevy_svg",
  "image 0.24.2",
  "iyes_loopless",
+ "serde",
  "winit",
 ]
 

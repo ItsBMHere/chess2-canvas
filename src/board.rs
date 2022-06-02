@@ -1,10 +1,80 @@
 
 use bevy::prelude::*;
 use bevy::input::mouse::{MouseMotion, MouseButtonInput};
-use std::ops::{Add, Sub};
+use std::ops::{Add, Sub, Deref, DerefMut};
+use serde::{Deserialize, Serialize};
 
 #[derive(Component)]
 struct Square;
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum SquareData {
+    Occupied,
+    Empty,
+}
+impl SquareData {
+    pub const fn is_occupied(&self) -> bool {
+        matches!(self, Self::Occupied)
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn console_output(&self) -> String {
+        format!(
+            "{}", 
+            match self {
+                SquareData::Occupied => "O",
+                SquareData::Empty => ".",
+            }
+        )
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TileMap {
+    piece_count: u8,
+    height: u8,
+    width: u8,
+    map: Vec<Vec<SquareData>>,
+}
+impl TileMap {
+    pub fn empty(width: u8, height: u8) -> Self {
+        let map = (0..height)
+            .into_iter()
+            .map(|_| (0..width).into_iter().map(|_| SquareData::Empty).collect())
+            .collect();
+        
+        Self {
+            piece_count: 0,
+            height,
+            width,
+            map,
+        }
+    }
+
+    pub fn get_width(&self) -> u8 {
+        self.width
+    }
+
+    pub fn get_height(&self) -> u8 {
+        self.height
+    }
+
+    pub fn get_piece_count(&self) -> u8 {
+        self.piece_count
+    }
+}
+impl Deref for TileMap {
+    type Target = Vec<Vec<SquareData>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.map
+    }
+}
+impl DerefMut for TileMap {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.map
+    }
+}
 
 #[derive(Component)]
 struct Midline;
@@ -84,6 +154,24 @@ impl PieceSize {
             height: x,
         }
     }
+}
+
+/// Tile size options
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum TileSize {
+    /// Fixed tile size
+    Fixed(f32),
+    /// Window adaptative tile size
+    Adaptive { min: f32, max: f32 },
+}
+
+/// Board position customization options
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum BoardPosition {
+    /// Centered board
+    Centered { offset: Vec3 },
+    /// Custom position
+    Custom(Vec3),
 }
 
 const DARK: Color = Color::rgb(0.71, 0.533, 0.388);
