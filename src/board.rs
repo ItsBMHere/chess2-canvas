@@ -1,9 +1,5 @@
 
 use bevy::prelude::*;
-use bevy::text::*;
-use iyes_loopless::prelude::*;
-use bevy_svg::prelude::{Svg2dBundle, Origin};
-use bevy::app::StartupStage;
 
 #[derive(Component)]
 struct Square;
@@ -62,17 +58,17 @@ impl PieceSize {
 }
 
 
-#[derive(Component)]
-enum Modes {
-    Cursor,
-    Pawn,
-    Knight,
-    Bishop,
-    Rook,
-    Queen,
-    King,
-    Trash,
-}
+// #[derive(Component)]
+// enum Modes {
+//     Cursor,
+//     Pawn,
+//     Knight,
+//     Bishop,
+//     Rook,
+//     Queen,
+//     King,
+//     Trash,
+// }
 
 const DARK: Color = Color::rgb(0.71, 0.533, 0.388);
 const LIGHT: Color = Color::rgb(0.941, 0.851, 0.71);
