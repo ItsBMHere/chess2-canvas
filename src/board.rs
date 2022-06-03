@@ -152,7 +152,7 @@ fn setup_board(mut commands: Commands) {
     }
 }
 
-/*fn draw_piece_dummy(mut commands: Commands, asset_server: Res<AssetServer>) {
+fn draw_piece_dummy(mut commands: Commands, asset_server: Res<AssetServer>) {
     let svg = asset_server.load("pieces\\a_b.svg");
     commands.spawn_bundle(Svg2dBundle {
         svg,
@@ -162,9 +162,9 @@ fn setup_board(mut commands: Commands) {
     .insert(Piece)
     .insert(Position {x: 4, y: 4})
     .insert(PieceSize::size(0.75));
-}*/
+}
 
-fn draw_piece_dummy(mut commands: Commands, asset_server: Res<AssetServer>) {
+/*fn draw_piece_dummy(mut commands: Commands, asset_server: Res<AssetServer>) {
     for x in 0..8 {
         commands.spawn_bundle(SpriteBundle {
             texture: asset_server.load("pieces\\c_p.png"),
@@ -184,7 +184,7 @@ fn draw_piece_dummy(mut commands: Commands, asset_server: Res<AssetServer>) {
 
     }
  
-}
+}*/
 
 
 
