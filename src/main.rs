@@ -22,6 +22,7 @@ fn main() {
             ..Default::default()
         })
         .add_startup_system(icon::set_icon)
+        .add_system(bevy::input::system::exit_on_esc_system)
         .add_plugins(DefaultPlugins)
         .add_plugins(DefaultPickingPlugins)
         .add_plugin(ShapePlugin)

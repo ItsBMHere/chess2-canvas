@@ -1,5 +1,6 @@
 
 use bevy::prelude::*;
+use bevy::window::CursorMoved;
 
 #[derive(Component)]
 struct Square;
@@ -55,6 +56,12 @@ impl PieceSize {
             height: x,
         }
     }
+}
+
+#[derive(Default, Component)]
+struct CursorState {
+    cursor_pos: Vec2,
+    sprite: Option<(Entity, Vec3)>,    
 }
 
 
@@ -277,6 +284,55 @@ fn notation_position_translation(windows: Res<Windows>, mut q: Query<(&Position,
     }
 }
 
+fn move_piece_system (
+    mut state: Local<CursorState>,
+    windows: Res<Windows>,
+    mut cursor_moved_event_reader: EventReader<CursorMoved>,
+    mouse_button_input: Res<Input<MouseButton>>,
+    mut sprites: Query<(Entity, &Sprite, With<PieceSize>)>,
+    mut transforms: Query<&mut Transform>,
+) {
+    fn cursor_to_sprite_diff(cursor_pos: &Vec2, sprite_pos: &Vec3) -> Vec3 {
+        Vec3::new(
+            sprite_pos.x - cursor_pos.x,
+            sprite_pos.y - cursor_pos.y,
+            2.,
+        )
+    }
+    let window = windows.get_primary().unwrap();
+    let half_window = Vec2::new(window.width() / 2., window.height() / 2.);
+    if let Some(cursor_ev) = cursor_moved_event_reader.iter().last() {
+        state.cursor_pos = cursor_ev.position - half_window;
+    };
+
+    if mouse_button_input.just_released(MouseButton::Left) {
+        state.sprite = None;
+        return;
+    }
+    if mouse_button_input.pressed(MouseButton::Left) && state.sprite.is_some() {
+        let sprite = state.sprite.unwrap();
+
+        let mut sprite_pos = transforms.get_mut(sprite.0).unwrap();
+
+        info!("Sprite position old: {:?}", sprite_pos.translation);
+        sprite_pos.translation.x = state.cursor_pos.x + sprite.1.x;
+        sprite_pos.translation.y = state.cursor_pos.y + sprite.1.y;
+        info!("Sprite position new: {:?}", sprite_pos.translation);
+        info!("Entity: {:?}", sprite);
+    }
+
+    if mouse_button_input.just_pressed(MouseButton::Left) {
+        for (entity, sprite, _piece_size) in sprites.iter_mut() {
+            let sprite_pos = transforms.get_mut(entity).unwrap().translation;
+            let diff = cursor_to_sprite_diff(&state.cursor_pos, &sprite_pos);
+            let sprite_size = sprite.custom_size.unwrap_or(Vec2::new(64.,64.));
+            if diff.length() < (sprite_size.x / 2.0) {
+                state.sprite = Some((entity, diff));
+            }
+        }
+    }
+}
+
 
 
 pub struct BoardPlugin;
@@ -307,6 +363,7 @@ impl Plugin for BoardPlugin {
                     .after("board_scale")
                     .with_system(notation_position_translation)
             )
+            .add_system(move_piece_system)
             .run();
     }
 }
