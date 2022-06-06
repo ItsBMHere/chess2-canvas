@@ -14,13 +14,15 @@ enum FilesRanks {
     Rank,
 }
 
-#[derive(Component)]
-struct Piece;
-
 #[derive(Component, Clone, Copy, PartialEq, Eq)]
 struct Position {
     x: i32,
     y: i32,
+}
+
+#[derive(Component)]
+struct Piece {
+    pos: Position,
 }
 
 #[derive(Component)]
@@ -177,7 +179,9 @@ fn draw_piece_dummy(mut commands: Commands, asset_server: Res<AssetServer>) {
             texture: asset_server.load("pieces\\c_p.png"),
             ..default()
         })
-        .insert(Piece)
+        .insert(Piece {
+            pos: Position {x, y: 6}
+        })
         .insert(Position {x, y: 6})
         .insert(PieceSize::size(0.67));
 
@@ -185,7 +189,9 @@ fn draw_piece_dummy(mut commands: Commands, asset_server: Res<AssetServer>) {
             texture: asset_server.load("pieces\\C_Pw.png"),
             ..default()
         })
-        .insert(Piece)
+        .insert(Piece {
+            pos: Position {x, y: 1}
+        })
         .insert(Position {x, y: 1})
         .insert(PieceSize::size(0.67));
 
@@ -248,22 +254,6 @@ fn position_translation(windows: Res<Windows>, mut q: Query<(&Position, &mut Tra
     }
 }
 
-fn piece_position_translation(windows: Res<Windows>, mut q: Query<(&Position, &mut Transform, With<Piece>)>) {
-    fn convert(pos: f32, bound_window: f32, bound_game: f32) -> f32 {
-        let tile_size = bound_window / bound_game;
-        pos / bound_game * bound_window - (bound_window / 2.) + (tile_size / 2.)
-    }
-
-    let window = windows.get_primary().unwrap();
-    for (pos, mut transform, _piece) in q.iter_mut() {
-        transform.translation = Vec3::new(
-            convert(pos.x as f32, window.width() as f32, 8f32),
-            convert(pos.y as f32, window.height() as f32, 8f32),
-            2.0,
-        );
-    }
-}
-
 fn notation_position_translation(windows: Res<Windows>, mut q: Query<(&Position, &mut Transform, &FilesRanks)>) {
     fn convert(pos: f32, bound_window: f32, bound_game: f32, notation_offset: &FilesRanks) -> f32 {
         let tile_size = bound_window / bound_game;
@@ -300,6 +290,7 @@ fn move_piece_system (
         )
     }
     let window = windows.get_primary().unwrap();
+    let tile_size = window.width() / 8.;
     let half_window = Vec2::new(window.width() / 2., window.height() / 2.);
     if let Some(cursor_ev) = cursor_moved_event_reader.iter().last() {
         state.cursor_pos = cursor_ev.position - half_window;
@@ -325,7 +316,7 @@ fn move_piece_system (
         for (entity, sprite, _piece_size) in sprites.iter_mut() {
             let sprite_pos = transforms.get_mut(entity).unwrap().translation;
             let diff = cursor_to_sprite_diff(&state.cursor_pos, &sprite_pos);
-            let sprite_size = sprite.custom_size.unwrap_or(Vec2::new(64.,64.));
+            let sprite_size = sprite.custom_size.unwrap_or(Vec2::new(tile_size,tile_size));
             if diff.length() < (sprite_size.x / 2.0) {
                 state.sprite = Some((entity, diff));
             }
@@ -333,7 +324,24 @@ fn move_piece_system (
     }
 }
 
+// fn piece_position_translation(windows: Res<Windows>, mut q: Query<(&Position, &mut Transform, With<Piece>)>) {
+fn piece_position_translation(windows: Res<Windows>, mut q: Query<(&Piece, &mut Transform)>) {    
+    fn convert(pos: f32, bound_window: f32, bound_game: f32) -> f32 {
+        let tile_size = bound_window / bound_game;
+        pos / bound_game * bound_window - (bound_window / 2.) + (tile_size / 2.)
+    }
 
+    
+
+    let window = windows.get_primary().unwrap();
+    for (piece, mut transform) in q.iter_mut() {
+        transform.translation = Vec3::new(
+            convert(piece.pos.x as f32, window.width() as f32, 8f32),
+            convert(piece.pos.y as f32, window.height() as f32, 8f32),
+            2.0,
+        );
+    }
+}
 
 pub struct BoardPlugin;
 impl Plugin for BoardPlugin {
@@ -345,6 +353,7 @@ impl Plugin for BoardPlugin {
                     .with_system(draw_midline.before(draw_notation).after(setup_board))
                     .with_system(draw_notation.after(setup_board).after(draw_midline))
                     .with_system(draw_piece_dummy.after(draw_notation))
+                    
             )
             .add_system_set_to_stage(
                 CoreStage::PostUpdate,
@@ -354,7 +363,8 @@ impl Plugin for BoardPlugin {
                     .with_system(size_scaling.before(position_translation))
                     .with_system(position_translation.after(size_scaling))
                     .with_system(piece_position_translation.after(position_translation))
-                    .with_system(piece_size_scaling)
+                    .with_system(piece_size_scaling.after(piece_position_translation))
+
             )
             .add_system_set_to_stage(
                 CoreStage::PostUpdate,
@@ -362,8 +372,8 @@ impl Plugin for BoardPlugin {
                     .label("notation_scale")
                     .after("board_scale")
                     .with_system(notation_position_translation)
+                    .with_system(move_piece_system)
             )
-            .add_system(move_piece_system)
             .run();
     }
 }
