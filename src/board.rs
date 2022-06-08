@@ -287,7 +287,6 @@ fn move_piece_system (
 
     if mouse_button_input.just_released(MouseButton::Left) {
         if let Some(sprite) = state.sprite {
-            warn!("Hooray! I got through!");
             let mut sprite_pos = transforms.get_mut(sprite.0).unwrap();
             let mut internal_piece_position = internal_positions.get_mut(sprite.0).unwrap();
             sprite_pos.translation = Vec3::new(
