@@ -11,15 +11,15 @@
 - [x] Draw an 8x8 grid of black and white squares.
 - [x] Draw the midline, between ranks 4 and 5.
 - [x] Draw notation for files (a-h) and ranks (1-8) 
-- [ ] Write logic to fill up window with board
+- [x] Write logic to fill up window with board
 - [ ] Write current board state to FEN2 string
 - [ ] Flip Board - pieces, and notation
 - [ ] Save board as PNG
 - [ ] 'Hand' mode
 	- [ ] Highlight Piece square when clicked & held
 	- [ ] Draw transparent piece on square clicked
-	- [ ] Draw piece sprite that follows cursor whilst left mouse is held down
-	- [ ] Draw piece on hovered-over square when left mouse is released
+	- [x] Draw piece sprite that follows cursor whilst left mouse is held down
+	- [x] Draw piece on hovered-over square when left mouse is released
 	- [ ] Erase transparent piece from previous square when left mouse released
 	- [ ] Erase highlight from previous square when left mouse released 
 	- [ ] Draw circle on hovered-over square when right mouse pressed
