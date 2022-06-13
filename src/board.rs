@@ -1,9 +1,8 @@
-
 use bevy::prelude::*;
 use bevy::window::CursorMoved;
-use bevy_inspector_egui::{WorldInspectorPlugin, Inspectable, RegisterInspectable};
+use bevy_inspector_egui::{Inspectable, RegisterInspectable, WorldInspectorPlugin};
 
-// A square on the board. 
+// A square on the board.
 #[derive(Component)]
 struct Square;
 
@@ -19,7 +18,7 @@ enum FilesRanks {
 
 // A co-ordinate of an entity on the board.
 // Not the same as algebraic notation, which itself is not necessary for the board editor
-#[derive(Component, Clone, Copy, PartialEq, Eq, Default, Inspectable)]
+#[derive(Component, Clone, Copy, PartialEq, Eq, Default, Inspectable, Debug)]
 struct Position {
     x: i32,
     y: i32,
@@ -73,7 +72,7 @@ impl PieceSize {
 struct CursorPos {
     cursor_pos: Vec2,
     cursor_grid_pos: Position,
-    sprite: Option<(Entity, Vec3)>,    
+    sprite: Option<(Entity, Vec3)>,
 }
 
 // Square colours
@@ -82,6 +81,12 @@ const LIGHT: Color = Color::rgb(0.941, 0.851, 0.71);
 // Notation strings
 const RANKS: &'static str = "12345678";
 const FILES: &'static str = "abcdefgh";
+
+struct PieceDragEvent;
+struct PieceDropEvent;
+#[derive(Debug)]
+struct DeletePieceEvent(Entity);
+struct DrawPieceEvent(Entity);
 
 
 // This system writes the files and rank numbers.
@@ -95,45 +100,50 @@ fn draw_notation(mut commands: Commands, asset_server: Res<AssetServer>) {
 
     // Draw out the letters and numbers
     for i in 0..8 {
-
         let (file, rank) = (FILES.as_bytes()[i] as char, RANKS.as_bytes()[i] as char);
         commands
-        .spawn_bundle(Text2dBundle {
-            text: Text::with_section(file, TextStyle {
-                font: asset_server.load("fonts\\NotoSans-Bold.ttf"),
-                font_size: 18.,
-                color: {
-                    if i % 2 == 0 {
-                        LIGHT
-                    } else {
-                        DARK
-                    }
-                },
-            },
-            text_alignment),
-            ..default()
-        })
-        .insert(FilesRanks::File)
-        .insert(Position {x: i as i32, y: 0} ); // each letter/number needs to be placed
+            .spawn_bundle(Text2dBundle {
+                text: Text::with_section(
+                    file,
+                    TextStyle {
+                        font: asset_server.load("fonts\\NotoSans-Bold.ttf"),
+                        font_size: 18.,
+                        color: {
+                            if i % 2 == 0 {
+                                LIGHT
+                            } else {
+                                DARK
+                            }
+                        },
+                    },
+                    text_alignment,
+                ),
+                ..default()
+            })
+            .insert(FilesRanks::File)
+            .insert(Position { x: i as i32, y: 0 }); // each letter/number needs to be placed
 
         commands
-        .spawn_bundle(Text2dBundle {
-            text: Text::with_section(rank, TextStyle {
-                font: asset_server.load("fonts\\NotoSans-Bold.ttf"),
-                font_size: 18.,
-                color: {
-                    if i % 2 == 0 {
-                        DARK
-                    } else {
-                        LIGHT
-                    }
-                },
-            },
-            text_alignment),
-            ..default()
-        })
-        .insert(FilesRanks::Rank)
-        .insert(Position {x: 7, y: i as i32} );
+            .spawn_bundle(Text2dBundle {
+                text: Text::with_section(
+                    rank,
+                    TextStyle {
+                        font: asset_server.load("fonts\\NotoSans-Bold.ttf"),
+                        font_size: 18.,
+                        color: {
+                            if i % 2 == 0 {
+                                DARK
+                            } else {
+                                LIGHT
+                            }
+                        },
+                    },
+                    text_alignment,
+                ),
+                ..default()
+            })
+            .insert(FilesRanks::Rank)
+            .insert(Position { x: 7, y: i as i32 });
     }
 }
 
@@ -145,22 +155,22 @@ fn setup_board(mut commands: Commands) {
     for x in 0..8 {
         for y in 0..8 {
             commands
-            .spawn_bundle(SpriteBundle {
-                sprite: Sprite {
-                    color: {
-                        if (x + y + 1) % 2 == 0 {
-                            LIGHT
-                        } else {
-                            DARK
-                        }
+                .spawn_bundle(SpriteBundle {
+                    sprite: Sprite {
+                        color: {
+                            if (x + y + 1) % 2 == 0 {
+                                LIGHT
+                            } else {
+                                DARK
+                            }
+                        },
+                        ..default()
                     },
                     ..default()
-                },
-                ..default()
-            })
-            .insert(Square)
-            .insert(Position {x, y})
-            .insert(Size::square(1.));
+                })
+                .insert(Square)
+                .insert(Position { x, y })
+                .insert(Size::square(1.));
         }
     }
 }
@@ -170,30 +180,27 @@ fn setup_board(mut commands: Commands) {
 // To be honest, I'm not entirely sure that Piece needs to have Position as a field here.
 fn draw_piece_dummy(mut commands: Commands, asset_server: Res<AssetServer>) {
     for x in 0..8 {
-        commands.spawn_bundle(SpriteBundle {
-            texture: asset_server.load("pieces\\n_p.png"),
-            ..default()
-        })
-        .insert(Piece {
-            pos: Position {x, y: 6}
-        })
-        .insert(Position {x, y: 6})
-        .insert(PieceSize::size(0.67));
+        commands
+            .spawn_bundle(SpriteBundle {
+                texture: asset_server.load("pieces\\n_p.png"),
+                ..default()
+            })
+            .insert(Piece {
+                pos: Position { x, y: 6 },
+            })
+            .insert(Position { x, y: 6 })
+            .insert(PieceSize::size(0.67));
 
-        commands.spawn_bundle(SpriteBundle {
-            texture: asset_server.load("pieces\\C_Pw.png"),
-            ..default()
-        })
-        .insert(Piece {
-            pos: Position {x, y: 1}
-        })
-        .insert(Position {x, y: 1})
-        .insert(PieceSize::size(0.67));
-
-        
-
+        commands
+            .spawn_bundle(SpriteBundle {
+                texture: asset_server.load("pieces\\C_Pw.png"),
+                ..default()
+            })
+            .insert(Piece {
+                pos: Position { x, y: 1 },
+            })
+            .insert(PieceSize::size(0.67));
     }
- 
 }
 
 
@@ -201,17 +208,16 @@ fn draw_piece_dummy(mut commands: Commands, asset_server: Res<AssetServer>) {
 // The midline is an Entity here - Could I draw it as just a plain old rectangular line?
 fn draw_midline(mut commands: Commands) {
     commands
-    .spawn_bundle(SpriteBundle {
-        sprite: Sprite {
-            color: Color::CYAN,
+        .spawn_bundle(SpriteBundle {
+            sprite: Sprite {
+                color: Color::CYAN,
+                ..default()
+            },
             ..default()
-        },
-        ..default()
-    })
-    .insert(Midline)
-    .insert(Size::rectangle(9.5));
-} 
-
+        })
+        .insert(Midline)
+        .insert(Size::rectangle(9.5));
+}
 
 // Scale entities with Size to fit the window size.
 fn size_scaling(windows: Res<Windows>, mut q: Query<(&Size, &mut Transform)>) {
@@ -240,7 +246,10 @@ fn piece_size_scaling(windows: Res<Windows>, mut q: Query<(&PieceSize, &mut Tran
 }
 
 // There's some black magic going on here with how the entities' positions in-game are translated to the Position struct.
-fn position_translation(windows: Res<Windows>, mut q: Query<(&Position, &mut Transform, With<Square>)>) {
+fn position_translation(
+    windows: Res<Windows>,
+    mut q: Query<(&Position, &mut Transform, With<Square>)>,
+) {
     fn convert(pos: f32, bound_window: f32, bound_game: f32) -> f32 {
         let tile_size = bound_window / bound_game;
         pos / bound_game * bound_window - (bound_window / 2.) + (tile_size / 2.)
@@ -257,14 +266,23 @@ fn position_translation(windows: Res<Windows>, mut q: Query<(&Position, &mut Tra
 }
 
 // We need to use a similar function for notation as above...
-fn notation_position_translation(windows: Res<Windows>, mut q: Query<(&Position, &mut Transform, &FilesRanks)>) {
+fn notation_position_translation(
+    windows: Res<Windows>,
+    mut q: Query<(&Position, &mut Transform, &FilesRanks)>,
+) {
     fn convert(pos: f32, bound_window: f32, bound_game: f32, notation_offset: &FilesRanks) -> f32 {
         let tile_size = bound_window / bound_game;
         match notation_offset {
-            FilesRanks::File => pos / bound_game * bound_window - (bound_window / 2.) + (tile_size / 2.) - (tile_size / 2.3),
-            FilesRanks::Rank => pos / bound_game * bound_window - (bound_window / 2.) + (tile_size / 2.) + (tile_size / 3.3)
+            FilesRanks::File => {
+                pos / bound_game * bound_window - (bound_window / 2.) + (tile_size / 2.)
+                    - (tile_size / 2.3)
+            }
+            FilesRanks::Rank => {
+                pos / bound_game * bound_window - (bound_window / 2.)
+                    + (tile_size / 2.)
+                    + (tile_size / 3.3)
+            }
         }
-        
     }
 
     let window = windows.get_primary().unwrap();
@@ -277,14 +295,13 @@ fn notation_position_translation(windows: Res<Windows>, mut q: Query<(&Position,
     }
 }
 
-
-fn move_piece_system (
+fn move_piece_system(
     mut state: Local<CursorPos>,
     windows: Res<Windows>,
     mut cursor_moved_event_reader: EventReader<CursorMoved>,
     mouse_button_input: Res<Input<MouseButton>>,
     mut sprites: Query<(Entity, &Sprite, With<PieceSize>)>,
-    mut internal_positions: Query<&mut Position>,
+    mut pieces: Query<&mut Piece>,
     mut transforms: Query<&mut Transform>,
 ) {
     fn convert(pos: f32, bound_window: f32, bound_game: f32) -> f32 {
@@ -293,11 +310,7 @@ fn move_piece_system (
     }
 
     fn cursor_to_sprite_diff(cursor_pos: &Vec2, sprite_pos: &Vec3) -> Vec3 {
-        Vec3::new(
-            sprite_pos.x - cursor_pos.x,
-            sprite_pos.y - cursor_pos.y,
-            2.,
-        )
+        Vec3::new(sprite_pos.x - cursor_pos.x, sprite_pos.y - cursor_pos.y, 2.)
     }
     let window = windows.get_primary().unwrap();
     let tile_size = window.width() / 8.;
@@ -313,25 +326,26 @@ fn move_piece_system (
     if mouse_button_input.just_released(MouseButton::Left) {
         if let Some(sprite) = state.sprite {
             let mut sprite_pos = transforms.get_mut(sprite.0).unwrap();
-            let mut internal_piece_position = internal_positions.get_mut(sprite.0).unwrap();
+            let mut piece_internal = pieces.get_mut(sprite.0).unwrap();
             sprite_pos.translation = Vec3::new(
                 convert(state.cursor_grid_pos.x as f32, window.width() as f32, 8f32),
                 convert(state.cursor_grid_pos.y as f32, window.height() as f32, 8f32),
                 2.0,
             );
 
-            internal_piece_position.x = state.cursor_grid_pos.x; 
-            internal_piece_position.y = state.cursor_grid_pos.y;
+            piece_internal.pos.x = state.cursor_grid_pos.x;
+            piece_internal.pos.y = state.cursor_grid_pos.y;
 
-            info!("Piece position on grid: ({}, {})", state.cursor_grid_pos.x, state.cursor_grid_pos.y);
-            info!("temp: ({}, {})", internal_piece_position.x, internal_piece_position.y);
+            info!(
+                "Piece position on grid: ({}, {})",
+                state.cursor_grid_pos.x, state.cursor_grid_pos.y
+            );
             state.sprite = None;
             return;
         } else {
             error!("You tried to move a piece, but no-one came.");
             return;
         }
-
     }
     if mouse_button_input.pressed(MouseButton::Left) && state.sprite.is_some() {
         let sprite = state.sprite.unwrap();
@@ -341,24 +355,28 @@ fn move_piece_system (
         sprite_pos.translation.x = state.cursor_pos.x;
         sprite_pos.translation.y = state.cursor_pos.y;
         sprite_pos.translation.z = 4.0;
-        
     }
 
     if mouse_button_input.just_pressed(MouseButton::Left) {
         for (entity, sprite, _piece_size) in sprites.iter_mut() {
             let sprite_pos = transforms.get_mut(entity).unwrap().translation;
             let diff = cursor_to_sprite_diff(&state.cursor_pos, &sprite_pos);
-            let sprite_size = sprite.custom_size.unwrap_or(Vec2::new(tile_size,tile_size));
+            let sprite_size = sprite
+                .custom_size
+                .unwrap_or(Vec2::new(tile_size, tile_size));
             if diff.length() < (sprite_size.x / 2.0) {
                 state.sprite = Some((entity, diff));
-                info!("Piece picked up on: ({}, {})", state.cursor_grid_pos.x, state.cursor_grid_pos.y);
-            }          
-        }        
+                info!(
+                    "Piece picked up on: ({}, {})",
+                    state.cursor_grid_pos.x, state.cursor_grid_pos.y
+                );
+            }
+        }
     }
 }
 
 // fn piece_position_translation(windows: Res<Windows>, mut q: Query<(&Position, &mut Transform, With<Piece>)>) {
-fn piece_position_translation(windows: Res<Windows>, mut q: Query<(&Piece, &mut Transform)>) {    
+fn piece_position_translation(windows: Res<Windows>, mut q: Query<(&Piece, &mut Transform)>) {
     fn convert(pos: f32, bound_window: f32, bound_game: f32) -> f32 {
         let tile_size = bound_window / bound_game;
         pos / bound_game * bound_window - (bound_window / 2.) + (tile_size / 2.)
@@ -374,37 +392,79 @@ fn piece_position_translation(windows: Res<Windows>, mut q: Query<(&Piece, &mut 
     }
 }
 
+
+fn delete_piece(
+  
+    mut ev_draw: EventWriter<DeletePieceEvent>,
+    mut state: Local<CursorPos>,
+    windows: Res<Windows>,
+    mut cursor_moved_event_reader: EventReader<CursorMoved>,
+    mouse_button_input: Res<Input<MouseButton>>,
+    pieces: Query<(Entity, &Piece)>,
+) {
+    let window = windows.get_primary().unwrap();
+    let tile_size = window.width() / 8.;
+    let half_window = Vec2::new(window.width() / 2., window.height() / 2.);
+    if let Some(cursor_ev) = cursor_moved_event_reader.iter().last() {
+        state.cursor_pos = cursor_ev.position - half_window;
+        state.cursor_grid_pos = Position {
+            x: (cursor_ev.position.x / tile_size) as i32,
+            y: (cursor_ev.position.y / tile_size) as i32,
+        };
+    };
+
+    if mouse_button_input.just_pressed(MouseButton::Right) {
+        for (ent, piece) in pieces.iter() {
+            if piece.pos == state.cursor_grid_pos {
+                warn!("Piece deleted at: ({}, {})", piece.pos.x, piece.pos.y);
+                ev_draw.send(DeletePieceEvent(ent));
+            }
+        }
+    }
+}
+
+fn delete_piece_listener(
+    mut commands: Commands,
+    mut ev_delete_piece_listener: EventReader<DeletePieceEvent>
+) {
+    for ev in ev_delete_piece_listener.iter() {
+        commands.entity(ev.0).despawn();
+    }
+}
+
 pub struct BoardPlugin;
 impl Plugin for BoardPlugin {
     fn build(&self, app: &mut App) {
-        app
-            .add_startup_system_set_to_stage(
-                StartupStage::PreStartup,
-                SystemSet::new()
-                    .with_system(setup_board.before(draw_midline).before(draw_notation))
-                    .with_system(draw_midline.before(draw_notation).after(setup_board))
-                    .with_system(draw_notation.after(setup_board).after(draw_midline))
-                    .with_system(draw_piece_dummy.after(draw_notation))
-
-                    
-            )
-            .add_startup_system_set_to_stage(
-                StartupStage::Startup,
-                SystemSet::new()
-                    .with_system(size_scaling.before(position_translation))
-                    .with_system(position_translation.after(size_scaling))
-                    .with_system(piece_position_translation.after(position_translation))
-                    .with_system(piece_size_scaling.after(piece_position_translation))
-
-            )
-            .add_system_set_to_stage(
-                CoreStage::PostUpdate,
-                SystemSet::new()
-                    .with_system(notation_position_translation)
-                    .with_system(move_piece_system)
-            )
-            .add_plugin(WorldInspectorPlugin::new())
-            .register_inspectable::<Position>()
-            .run();
+        app.add_startup_system_set_to_stage(
+            StartupStage::PreStartup,
+            SystemSet::new()
+                .with_system(setup_board.before(draw_midline).before(draw_notation))
+                .with_system(draw_midline.before(draw_notation).after(setup_board))
+                .with_system(draw_notation.after(setup_board).after(draw_midline))
+                .with_system(draw_piece_dummy.after(draw_notation)),
+        )
+        .add_startup_system_set_to_stage(
+            StartupStage::Startup,
+            SystemSet::new()
+                .with_system(size_scaling.before(position_translation))
+                .with_system(position_translation.after(size_scaling))
+                .with_system(piece_position_translation.after(position_translation))
+                .with_system(piece_size_scaling.after(piece_position_translation)),
+        )
+        .add_system_set_to_stage(
+            CoreStage::PostUpdate,
+            SystemSet::new()
+                .with_system(notation_position_translation)
+                .with_system(move_piece_system)
+                .with_system(delete_piece.after(move_piece_system))
+                .with_system(delete_piece_listener.after(delete_piece)),
+        )
+        .add_event::<PieceDragEvent>()
+        .add_event::<PieceDropEvent>()
+        .add_event::<DrawPieceEvent>()
+        .add_event::<DeletePieceEvent>()
+        .add_plugin(WorldInspectorPlugin::new())
+        .register_inspectable::<Position>()
+        .run();
     }
 }

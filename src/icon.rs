@@ -1,8 +1,8 @@
+use bevy::prelude::NonSend;
 use bevy::window::WindowId;
 use bevy::winit::WinitWindows;
-use winit::window::Icon;
-use bevy::prelude::NonSend;
 use std::path::Path;
+use winit::window::Icon;
 
 // Use bevy's WindowId struct and the winit library to display a taskbar/favicon.
 pub fn set_icon(window: NonSend<WinitWindows>) {
@@ -23,5 +23,4 @@ pub fn set_icon(window: NonSend<WinitWindows>) {
     let icon = Icon::from_rgba(icon_rgba, icon_width, icon_height).unwrap();
 
     primary.set_window_icon(Some(icon));
-
 }
