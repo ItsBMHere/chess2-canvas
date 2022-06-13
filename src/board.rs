@@ -79,8 +79,8 @@ struct CursorPos {
 const DARK: Color = Color::rgb(0.71, 0.533, 0.388);
 const LIGHT: Color = Color::rgb(0.941, 0.851, 0.71);
 // Notation strings
-const RANKS: &'static str = "12345678";
-const FILES: &'static str = "abcdefgh";
+const RANKS: &str = "12345678";
+const FILES: &str = "abcdefgh";
 
 struct PieceDragEvent;
 struct PieceDropEvent;
