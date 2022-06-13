@@ -4,11 +4,13 @@ use winit::window::Icon;
 use bevy::prelude::NonSend;
 use std::path::Path;
 
+// Use bevy's WindowId struct and the winit library to display a taskbar/favicon.
 pub fn set_icon(window: NonSend<WinitWindows>) {
     let primary = window.get_window(WindowId::primary()).unwrap();
     let path = Path::new("assets\\pieces\\icon.png");
 
     // image - not bevy-native but bevy doesn't support changing the icon yet
+    // Image can be loaded with an asset server - the method below is more direct, and simpler.
     let (icon_rgba, icon_width, icon_height) = {
         let image = image::open(path)
             .expect("Couldn't open image path")

@@ -3,9 +3,11 @@ use bevy::prelude::*;
 use bevy::window::CursorMoved;
 use bevy_inspector_egui::{WorldInspectorPlugin, Inspectable, RegisterInspectable};
 
+// A square on the board. 
 #[derive(Component)]
 struct Square;
 
+// Component for the midline, which is really just a simple rectangle drawn over the board, and serves no other function than decoration.
 #[derive(Component)]
 struct Midline;
 
@@ -15,17 +17,21 @@ enum FilesRanks {
     Rank,
 }
 
+// A co-ordinate of an entity on the board.
+// Not the same as algebraic notation, which itself is not necessary for the board editor
 #[derive(Component, Clone, Copy, PartialEq, Eq, Default, Inspectable)]
 struct Position {
     x: i32,
     y: i32,
 }
 
+// Component signifying a piece on the board and its position.
 #[derive(Component)]
 struct Piece {
     pos: Position,
 }
 
+// Determines the size of other components, except pieces
 #[derive(Component)]
 struct Size {
     width: f32,
@@ -47,6 +53,7 @@ impl Size {
     }
 }
 
+// Determines the size of pieces - kept separate because when I query for Size, I get Piece components thrown in the mix...
 #[derive(Component)]
 struct PieceSize {
     width: f32,
@@ -61,26 +68,32 @@ impl PieceSize {
     }
 }
 
+// A component to keep track of the cursor's position in the window.
 #[derive(Default, Component)]
-struct CursorState {
+struct CursorPos {
     cursor_pos: Vec2,
     cursor_grid_pos: Position,
     sprite: Option<(Entity, Vec3)>,    
 }
 
+// Square colours
 const DARK: Color = Color::rgb(0.71, 0.533, 0.388);
 const LIGHT: Color = Color::rgb(0.941, 0.851, 0.71);
-
+// Notation strings
 const RANKS: &'static str = "12345678";
 const FILES: &'static str = "abcdefgh";
 
 
+// This system writes the files and rank numbers.
+// At present, it does not scale to window size. I need to think of an algorithm that might solve this problem...
 fn draw_notation(mut commands: Commands, asset_server: Res<AssetServer>) {
+    // Setting the alignment of the text to bottom and left
     let text_alignment = TextAlignment {
         vertical: VerticalAlign::Bottom,
         horizontal: HorizontalAlign::Left,
     };
 
+    // Draw out the letters and numbers
     for i in 0..8 {
 
         let (file, rank) = (FILES.as_bytes()[i] as char, RANKS.as_bytes()[i] as char);
@@ -101,7 +114,7 @@ fn draw_notation(mut commands: Commands, asset_server: Res<AssetServer>) {
             ..default()
         })
         .insert(FilesRanks::File)
-        .insert(Position {x: i as i32, y: 0} );
+        .insert(Position {x: i as i32, y: 0} ); // each letter/number needs to be placed
 
         commands
         .spawn_bundle(Text2dBundle {
@@ -124,6 +137,8 @@ fn draw_notation(mut commands: Commands, asset_server: Res<AssetServer>) {
     }
 }
 
+// Spawns camera bundle;
+// Create square entities, with position and size.
 fn setup_board(mut commands: Commands) {
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
 
@@ -150,6 +165,9 @@ fn setup_board(mut commands: Commands) {
     }
 }
 
+// Dummy function that draws 8 pawns.
+// Spawn piece entity with Position and PieceSize.
+// To be honest, I'm not entirely sure that Piece needs to have Position as a field here.
 fn draw_piece_dummy(mut commands: Commands, asset_server: Res<AssetServer>) {
     for x in 0..8 {
         commands.spawn_bundle(SpriteBundle {
@@ -180,7 +198,7 @@ fn draw_piece_dummy(mut commands: Commands, asset_server: Res<AssetServer>) {
 
 
 
-
+// The midline is an Entity here - Could I draw it as just a plain old rectangular line?
 fn draw_midline(mut commands: Commands) {
     commands
     .spawn_bundle(SpriteBundle {
@@ -194,8 +212,11 @@ fn draw_midline(mut commands: Commands) {
     .insert(Size::rectangle(9.5));
 } 
 
+
+// Scale entities with Size to fit the window size.
 fn size_scaling(windows: Res<Windows>, mut q: Query<(&Size, &mut Transform)>) {
     let window = windows.get_primary().unwrap();
+    // This function is where the magic happens, since we're on a 8x8 board we divide by 8
     for (sprite_size, mut transform) in q.iter_mut() {
         transform.scale = Vec3::new(
             sprite_size.width / 8f32 * window.width() as f32,
@@ -205,6 +226,8 @@ fn size_scaling(windows: Res<Windows>, mut q: Query<(&Size, &mut Transform)>) {
     }
 }
 
+// Scale entities with PieceSize to fit the window size.
+// Pieces get resized when they're moved in much the same way.
 fn piece_size_scaling(windows: Res<Windows>, mut q: Query<(&PieceSize, &mut Transform)>) {
     let window = windows.get_primary().unwrap();
     for (sprite_size, mut transform) in q.iter_mut() {
@@ -216,7 +239,7 @@ fn piece_size_scaling(windows: Res<Windows>, mut q: Query<(&PieceSize, &mut Tran
     }
 }
 
-
+// There's some black magic going on here with how the entities' positions in-game are translated to the Position struct.
 fn position_translation(windows: Res<Windows>, mut q: Query<(&Position, &mut Transform, With<Square>)>) {
     fn convert(pos: f32, bound_window: f32, bound_game: f32) -> f32 {
         let tile_size = bound_window / bound_game;
@@ -233,6 +256,7 @@ fn position_translation(windows: Res<Windows>, mut q: Query<(&Position, &mut Tra
     }
 }
 
+// We need to use a similar function for notation as above...
 fn notation_position_translation(windows: Res<Windows>, mut q: Query<(&Position, &mut Transform, &FilesRanks)>) {
     fn convert(pos: f32, bound_window: f32, bound_game: f32, notation_offset: &FilesRanks) -> f32 {
         let tile_size = bound_window / bound_game;
@@ -253,8 +277,9 @@ fn notation_position_translation(windows: Res<Windows>, mut q: Query<(&Position,
     }
 }
 
+
 fn move_piece_system (
-    mut state: Local<CursorState>,
+    mut state: Local<CursorPos>,
     windows: Res<Windows>,
     mut cursor_moved_event_reader: EventReader<CursorMoved>,
     mouse_button_input: Res<Input<MouseButton>>,
