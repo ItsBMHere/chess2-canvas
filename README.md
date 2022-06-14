@@ -16,12 +16,12 @@
 - [ ] Flip Board - pieces, and notation
 - [ ] Save board as PNG
 - [ ] 'Hand' mode
-	- [ ] Highlight Piece square when clicked & held
+	- [x] Highlight Piece square when clicked & held
 	- [ ] Draw transparent piece on square clicked
 	- [x] Draw piece sprite that follows cursor whilst left mouse is held down
 	- [x] Draw piece on hovered-over square when left mouse is released
 	- [ ] Erase transparent piece from previous square when left mouse released
-	- [ ] Erase highlight from previous square when left mouse released 
+	- [x] Erase highlight from previous square when left mouse released 
 	- [ ] Draw circle on hovered-over square when right mouse pressed
 	- [ ] Draw arrow between right-clicked square and hovered-over square when right mouse pressed, held, & dragged
 	- [ ] Erase arrows on left mouse press
@@ -33,7 +33,8 @@
 		- [ ] Overwrite pieces from old army with new army
 	- [ ] Cycle through piece to place with 1/2/3/4/5/6
 - [ ] 'Trash' mode
-	- [ ] Erase piece on hovered-over square on left mouse press
+	- [x] Erase piece on hovered-over square on left mouse press
+	(OK - this one is a bit tenuous at the moment...)
 - [ ] FEN
 	- [ ] Parse FEN2 to board position 
 	- [ ] Parse Fischerrandom to board position by value (as per the [most recent ruleset](https://static1.squarespace.com/static/575f8cb8ab48de461197681a/t/5f2e3acc0fe05d162d2c0834/1596865230951/chess2_rulebook3-0.pdf))
