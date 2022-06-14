@@ -6,6 +6,10 @@ use bevy_inspector_egui::{Inspectable, RegisterInspectable, WorldInspectorPlugin
 #[derive(Component)]
 struct Square;
 
+// A highlight on the board.
+#[derive(Component)]
+struct HighlightSquare;
+
 // Component for the midline, which is really just a simple rectangle drawn over the board, and serves no other function than decoration.
 #[derive(Component)]
 struct Midline;
@@ -37,7 +41,7 @@ struct Size {
     height: f32,
 }
 impl Size {
-    pub fn square(x: f32) -> Self {
+    pub const fn square(x: f32) -> Self {
         Self {
             width: x,
             height: x,
@@ -59,7 +63,7 @@ struct PieceSize {
     height: f32,
 }
 impl PieceSize {
-    pub fn size(x: f32) -> Self {
+    pub const fn size(x: f32) -> Self {
         Self {
             width: x,
             height: x,
@@ -78,12 +82,13 @@ struct CursorPos {
 // Square colours
 const DARK: Color = Color::rgb(0.71, 0.533, 0.388);
 const LIGHT: Color = Color::rgb(0.941, 0.851, 0.71);
+const HIGHLIGHT: Color = Color::rgba(0.39,0.54,0.42, 0.75);
 // Notation strings
 const RANKS: &str = "12345678";
 const FILES: &str = "abcdefgh";
 
-struct PieceDragEvent;
-struct PieceDropEvent;
+struct PieceDragEvent(Entity, Position);
+struct PieceDropEvent(Entity);
 #[derive(Debug)]
 struct DeletePieceEvent(Entity);
 struct DrawPieceEvent(Entity);
@@ -265,6 +270,26 @@ fn position_translation(
     }
 }
 
+//Do the same for highlights.
+fn highlight_position_translation(
+    windows: Res<Windows>,
+    mut q: Query<(&Position, &mut Transform, With<HighlightSquare>)>,
+) {
+    fn convert(pos: f32, bound_window: f32, bound_game: f32) -> f32 {
+        let tile_size = bound_window / bound_game;
+        pos / bound_game * bound_window - (bound_window / 2.) + (tile_size / 2.)
+    }
+
+    let window = windows.get_primary().unwrap();
+    for (pos, mut transform, _square) in q.iter_mut() {
+        transform.translation = Vec3::new(
+            convert(pos.x as f32, window.width() as f32, 8f32),
+            convert(pos.y as f32, window.height() as f32, 8f32),
+            1.0,
+        );
+    }
+}
+
 // We need to use a similar function for notation as above...
 fn notation_position_translation(
     windows: Res<Windows>,
@@ -290,12 +315,14 @@ fn notation_position_translation(
         transform.translation = Vec3::new(
             convert(pos.x as f32, window.width() as f32, 8f32, notation),
             convert(pos.y as f32, window.height() as f32, 8f32, notation),
-            1.0,
+            2.0,
         );
     }
 }
 
 fn move_piece_system(
+    mut ev_drag: EventWriter<PieceDragEvent>,
+    mut ev_drop: EventWriter<PieceDropEvent>,
     mut state: Local<CursorPos>,
     windows: Res<Windows>,
     mut cursor_moved_event_reader: EventReader<CursorMoved>,
@@ -303,12 +330,13 @@ fn move_piece_system(
     mut sprites: Query<(Entity, &Sprite, With<PieceSize>)>,
     mut pieces: Query<&mut Piece>,
     mut transforms: Query<&mut Transform>,
+    mut highlight_q: Query<(Entity, &HighlightSquare)>,
 ) {
     fn convert(pos: f32, bound_window: f32, bound_game: f32) -> f32 {
         let tile_size = bound_window / bound_game;
         pos / bound_game * bound_window - (bound_window / 2.) + (tile_size / 2.)
     }
-
+    // Calculates the difference between the cursor's position and the sprite's position
     fn cursor_to_sprite_diff(cursor_pos: &Vec2, sprite_pos: &Vec3) -> Vec3 {
         Vec3::new(sprite_pos.x - cursor_pos.x, sprite_pos.y - cursor_pos.y, 2.)
     }
@@ -340,10 +368,10 @@ fn move_piece_system(
                 "Piece position on grid: ({}, {})",
                 state.cursor_grid_pos.x, state.cursor_grid_pos.y
             );
+            
+            let hl = highlight_q.single_mut();
+            ev_drop.send(PieceDropEvent(hl.0));
             state.sprite = None;
-            return;
-        } else {
-            error!("You tried to move a piece, but no-one came.");
             return;
         }
     }
@@ -363,13 +391,14 @@ fn move_piece_system(
             let diff = cursor_to_sprite_diff(&state.cursor_pos, &sprite_pos);
             let sprite_size = sprite
                 .custom_size
-                .unwrap_or(Vec2::new(tile_size, tile_size));
+                .unwrap_or_else(|| Vec2::new(tile_size, tile_size));
             if diff.length() < (sprite_size.x / 2.0) {
                 state.sprite = Some((entity, diff));
                 info!(
                     "Piece picked up on: ({}, {})",
                     state.cursor_grid_pos.x, state.cursor_grid_pos.y
                 );
+                ev_drag.send(PieceDragEvent(entity, state.cursor_grid_pos));
             }
         }
     }
@@ -395,7 +424,7 @@ fn piece_position_translation(windows: Res<Windows>, mut q: Query<(&Piece, &mut 
 
 fn delete_piece(
   
-    mut ev_draw: EventWriter<DeletePieceEvent>,
+    mut ev_delete: EventWriter<DeletePieceEvent>,
     mut state: Local<CursorPos>,
     windows: Res<Windows>,
     mut cursor_moved_event_reader: EventReader<CursorMoved>,
@@ -417,9 +446,37 @@ fn delete_piece(
         for (ent, piece) in pieces.iter() {
             if piece.pos == state.cursor_grid_pos {
                 warn!("Piece deleted at: ({}, {})", piece.pos.x, piece.pos.y);
-                ev_draw.send(DeletePieceEvent(ent));
+                ev_delete.send(DeletePieceEvent(ent));
             }
         }
+    }
+}
+
+fn draw_highlight(
+    mut commands: Commands,
+    mut ev_draw_highlight: EventReader<PieceDragEvent>,
+) {
+    if let Some(ev) = ev_draw_highlight.iter().last() {
+        commands
+            .spawn_bundle(SpriteBundle {
+                sprite: Sprite {
+                    color: HIGHLIGHT,
+                    ..default()
+                },
+                ..default()
+            })
+            .insert(HighlightSquare)
+            .insert(ev.1)
+            .insert(Size::square(1.));
+    }
+}
+
+fn erase_highlight(
+    mut commands: Commands,
+    mut ev_drop: EventReader<PieceDropEvent>
+) {
+    for ev in ev_drop.iter() {
+        commands.entity(ev.0).despawn();
     }
 }
 
@@ -446,8 +503,8 @@ impl Plugin for BoardPlugin {
         .add_startup_system_set_to_stage(
             StartupStage::Startup,
             SystemSet::new()
-                .with_system(size_scaling.before(position_translation))
-                .with_system(position_translation.after(size_scaling))
+                //.with_system(size_scaling.before(position_translation))
+                .with_system(position_translation)
                 .with_system(piece_position_translation.after(position_translation))
                 .with_system(piece_size_scaling.after(piece_position_translation)),
         )
@@ -457,7 +514,11 @@ impl Plugin for BoardPlugin {
                 .with_system(notation_position_translation)
                 .with_system(move_piece_system)
                 .with_system(delete_piece.after(move_piece_system))
-                .with_system(delete_piece_listener.after(delete_piece)),
+                .with_system(delete_piece_listener.after(delete_piece))
+                .with_system(draw_highlight.before(highlight_position_translation))
+                .with_system(highlight_position_translation.before(size_scaling))
+                .with_system(erase_highlight.after(highlight_position_translation))
+                .with_system(size_scaling),
         )
         .add_event::<PieceDragEvent>()
         .add_event::<PieceDropEvent>()

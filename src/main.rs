@@ -14,7 +14,7 @@ fn main() {
         .insert_resource(WindowDescriptor {
             width: 768.,
             height: 768.,
-            title: "Chess 2 Board Editor".to_string(),
+            title: "Chess 2 Board Editor".to_owned(),
             resizable: false,
             ..Default::default()
         })
@@ -27,5 +27,5 @@ fn main() {
         .add_plugin(bevy::diagnostic::EntityCountDiagnosticsPlugin)
         // Board plugin - organises all board entities, components, and systems
         .add_plugin(BoardPlugin)
-        .run()
+        .run();
 }
