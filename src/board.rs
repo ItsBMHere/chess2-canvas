@@ -28,6 +28,10 @@ struct Position {
     y: i32,
 }
 
+// A marked square on the board.
+#[derive(Component)]
+struct Marker;
+
 // Component signifying a piece on the board and its position.
 #[derive(Component)]
 struct Piece {
@@ -82,7 +86,7 @@ struct CursorPos {
 // Square colours
 const DARK: Color = Color::rgb(0.71, 0.533, 0.388);
 const LIGHT: Color = Color::rgb(0.941, 0.851, 0.71);
-const HIGHLIGHT: Color = Color::rgba(0.39,0.54,0.42, 0.75);
+const HIGHLIGHT: Color = Color::rgba(0.39, 0.54, 0.42, 0.75);
 // Notation strings
 const RANKS: &str = "12345678";
 const FILES: &str = "abcdefgh";
@@ -92,7 +96,7 @@ struct PieceDropEvent(Entity);
 #[derive(Debug)]
 struct DeletePieceEvent(Entity);
 struct DrawPieceEvent(Entity);
-
+struct DrawMarkerEvent(Position);
 
 // This system writes the files and rank numbers.
 // At present, it does not scale to window size. I need to think of an algorithm that might solve this problem...
@@ -208,8 +212,6 @@ fn draw_piece_dummy(mut commands: Commands, asset_server: Res<AssetServer>) {
     }
 }
 
-
-
 // The midline is an Entity here - Could I draw it as just a plain old rectangular line?
 fn draw_midline(mut commands: Commands) {
     commands
@@ -250,16 +252,17 @@ fn piece_size_scaling(windows: Res<Windows>, mut q: Query<(&PieceSize, &mut Tran
     }
 }
 
+// This function is used in several others to sprites on the board, in the middle of its square.
+fn convert(pos: f32, bound_window: f32, bound_game: f32) -> f32 {
+    let tile_size = bound_window / bound_game;
+    pos / bound_game * bound_window - (bound_window / 2.) + (tile_size / 2.)
+}
+
 // There's some black magic going on here with how the entities' positions in-game are translated to the Position struct.
 fn position_translation(
     windows: Res<Windows>,
     mut q: Query<(&Position, &mut Transform, With<Square>)>,
 ) {
-    fn convert(pos: f32, bound_window: f32, bound_game: f32) -> f32 {
-        let tile_size = bound_window / bound_game;
-        pos / bound_game * bound_window - (bound_window / 2.) + (tile_size / 2.)
-    }
-
     let window = windows.get_primary().unwrap();
     for (pos, mut transform, _square) in q.iter_mut() {
         transform.translation = Vec3::new(
@@ -275,11 +278,6 @@ fn highlight_position_translation(
     windows: Res<Windows>,
     mut q: Query<(&Position, &mut Transform, With<HighlightSquare>)>,
 ) {
-    fn convert(pos: f32, bound_window: f32, bound_game: f32) -> f32 {
-        let tile_size = bound_window / bound_game;
-        pos / bound_game * bound_window - (bound_window / 2.) + (tile_size / 2.)
-    }
-
     let window = windows.get_primary().unwrap();
     for (pos, mut transform, _square) in q.iter_mut() {
         transform.translation = Vec3::new(
@@ -295,6 +293,7 @@ fn notation_position_translation(
     windows: Res<Windows>,
     mut q: Query<(&Position, &mut Transform, &FilesRanks)>,
 ) {
+    // Overwrites the primary convert() function cos we need to include FilesRanks
     fn convert(pos: f32, bound_window: f32, bound_game: f32, notation_offset: &FilesRanks) -> f32 {
         let tile_size = bound_window / bound_game;
         match notation_offset {
@@ -320,6 +319,11 @@ fn notation_position_translation(
     }
 }
 
+// Calculates the difference between the cursor's position and the sprite's position
+fn cursor_to_sprite_diff(cursor_pos: &Vec2, sprite_pos: &Vec3) -> Vec3 {
+    Vec3::new(sprite_pos.x - cursor_pos.x, sprite_pos.y - cursor_pos.y, 2.)
+}
+
 fn move_piece_system(
     mut ev_drag: EventWriter<PieceDragEvent>,
     mut ev_drop: EventWriter<PieceDropEvent>,
@@ -332,14 +336,6 @@ fn move_piece_system(
     mut transforms: Query<&mut Transform>,
     mut highlight_q: Query<(Entity, &HighlightSquare)>,
 ) {
-    fn convert(pos: f32, bound_window: f32, bound_game: f32) -> f32 {
-        let tile_size = bound_window / bound_game;
-        pos / bound_game * bound_window - (bound_window / 2.) + (tile_size / 2.)
-    }
-    // Calculates the difference between the cursor's position and the sprite's position
-    fn cursor_to_sprite_diff(cursor_pos: &Vec2, sprite_pos: &Vec3) -> Vec3 {
-        Vec3::new(sprite_pos.x - cursor_pos.x, sprite_pos.y - cursor_pos.y, 2.)
-    }
     let window = windows.get_primary().unwrap();
     let tile_size = window.width() / 8.;
     let half_window = Vec2::new(window.width() / 2., window.height() / 2.);
@@ -368,7 +364,7 @@ fn move_piece_system(
                 "Piece position on grid: ({}, {})",
                 state.cursor_grid_pos.x, state.cursor_grid_pos.y
             );
-            
+
             let hl = highlight_q.single_mut();
             ev_drop.send(PieceDropEvent(hl.0));
             state.sprite = None;
@@ -406,11 +402,6 @@ fn move_piece_system(
 
 // fn piece_position_translation(windows: Res<Windows>, mut q: Query<(&Position, &mut Transform, With<Piece>)>) {
 fn piece_position_translation(windows: Res<Windows>, mut q: Query<(&Piece, &mut Transform)>) {
-    fn convert(pos: f32, bound_window: f32, bound_game: f32) -> f32 {
-        let tile_size = bound_window / bound_game;
-        pos / bound_game * bound_window - (bound_window / 2.) + (tile_size / 2.)
-    }
-
     let window = windows.get_primary().unwrap();
     for (piece, mut transform) in q.iter_mut() {
         transform.translation = Vec3::new(
@@ -421,9 +412,7 @@ fn piece_position_translation(windows: Res<Windows>, mut q: Query<(&Piece, &mut 
     }
 }
 
-
 fn delete_piece(
-  
     mut ev_delete: EventWriter<DeletePieceEvent>,
     mut state: Local<CursorPos>,
     windows: Res<Windows>,
@@ -442,7 +431,7 @@ fn delete_piece(
         };
     };
 
-    if mouse_button_input.just_pressed(MouseButton::Right) {
+    if mouse_button_input.just_pressed(MouseButton::Middle) {
         for (ent, piece) in pieces.iter() {
             if piece.pos == state.cursor_grid_pos {
                 warn!("Piece deleted at: ({}, {})", piece.pos.x, piece.pos.y);
@@ -452,10 +441,43 @@ fn delete_piece(
     }
 }
 
-fn draw_highlight(
+// This system listens for a right-click and then sends a DrawMarkerEvent to draw_marker().
+// When it receives a left-click, it sends an EraseMarkerEvent, which is heard by erase_markers()
+fn marker_system(
     mut commands: Commands,
-    mut ev_draw_highlight: EventReader<PieceDragEvent>,
+    mut state: Local<CursorPos>,
+    windows: Res<Windows>,
+    mut cursor_moved_event_reader: EventReader<CursorMoved>,
+    mouse_button_input: Res<Input<MouseButton>>,
 ) {
+    let window = windows.get_primary().unwrap();
+    let tile_size = window.width() / 8.;
+    let half_window = Vec2::new(window.width() / 2., window.height() / 2.);
+    if let Some(cursor_ev) = cursor_moved_event_reader.iter().last() {
+        state.cursor_pos = cursor_ev.position - half_window;
+        state.cursor_grid_pos = Position {
+            x: (cursor_ev.position.x / tile_size) as i32,
+            y: (cursor_ev.position.y / tile_size) as i32,
+        };
+    };
+
+    if mouse_button_input.just_pressed(MouseButton::Right) {
+        commands
+            .spawn_bundle(SpriteBundle {
+                sprite: Sprite {
+                    color: HIGHLIGHT,
+                    ..default()
+                },
+                ..default()
+            })
+            .insert(HighlightSquare)
+            .insert(Marker)
+            .insert(Position {x: state.cursor_grid_pos.x, y: state.cursor_grid_pos.y})
+            .insert(Size::square(1.));
+    }
+}
+
+fn draw_highlight(mut commands: Commands, mut ev_draw_highlight: EventReader<PieceDragEvent>) {
     if let Some(ev) = ev_draw_highlight.iter().last() {
         commands
             .spawn_bundle(SpriteBundle {
@@ -471,10 +493,7 @@ fn draw_highlight(
     }
 }
 
-fn erase_highlight(
-    mut commands: Commands,
-    mut ev_drop: EventReader<PieceDropEvent>
-) {
+fn erase_highlight(mut commands: Commands, mut ev_drop: EventReader<PieceDropEvent>) {
     for ev in ev_drop.iter() {
         commands.entity(ev.0).despawn();
     }
@@ -482,7 +501,7 @@ fn erase_highlight(
 
 fn delete_piece_listener(
     mut commands: Commands,
-    mut ev_delete_piece_listener: EventReader<DeletePieceEvent>
+    mut ev_delete_piece_listener: EventReader<DeletePieceEvent>,
 ) {
     for ev in ev_delete_piece_listener.iter() {
         commands.entity(ev.0).despawn();
@@ -518,7 +537,8 @@ impl Plugin for BoardPlugin {
                 .with_system(draw_highlight.before(highlight_position_translation))
                 .with_system(highlight_position_translation.before(size_scaling))
                 .with_system(erase_highlight.after(highlight_position_translation))
-                .with_system(size_scaling),
+                .with_system(size_scaling)
+                .with_system(marker_system),
         )
         .add_event::<PieceDragEvent>()
         .add_event::<PieceDropEvent>()
