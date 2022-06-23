@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use iyes_loopless::prelude::*;
 use bevy::window::CursorMoved;
 use bevy_inspector_egui::{Inspectable, RegisterInspectable, WorldInspectorPlugin};
 
@@ -83,10 +84,30 @@ struct CursorPos {
     sprite: Option<(Entity, Vec3)>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum PieceCursor {
+    King,
+    Queen,
+    Rook,
+    Bishop,
+    Knight,
+    Pawn,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum CursorState {
+    DragDrop,
+    Trash,
+    Place(PieceCursor),
+}
+
+
 // Square colours
 const DARK: Color = Color::rgb(0.71, 0.533, 0.388);
 const LIGHT: Color = Color::rgb(0.941, 0.851, 0.71);
 const HIGHLIGHT: Color = Color::rgba(0.39, 0.54, 0.42, 0.75);
+const MARKER: Color = Color::rgba(0.39, 0.89, 0.957, 0.75);
+const MIDLINE: Color = Color::rgb(0.06, 0.06, 0.74);
 // Notation strings
 const RANKS: &str = "12345678";
 const FILES: &str = "abcdefgh";
@@ -187,7 +208,7 @@ fn setup_board(mut commands: Commands) {
 // Dummy function that draws 8 pawns.
 // Spawn piece entity with Position and PieceSize.
 // To be honest, I'm not entirely sure that Piece needs to have Position as a field here.
-fn draw_piece_dummy(mut commands: Commands, asset_server: Res<AssetServer>) {
+fn draw_piece_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     for x in 0..8 {
         commands
             .spawn_bundle(SpriteBundle {
@@ -217,7 +238,11 @@ fn draw_midline(mut commands: Commands) {
     commands
         .spawn_bundle(SpriteBundle {
             sprite: Sprite {
-                color: Color::CYAN,
+                color: MIDLINE,
+                ..default()
+            },
+            transform: Transform {
+                translation: Vec3::new(0., 0., 1.5),
                 ..default()
             },
             ..default()
@@ -334,7 +359,7 @@ fn move_piece_system(
     mut sprites: Query<(Entity, &Sprite, With<PieceSize>)>,
     mut pieces: Query<&mut Piece>,
     mut transforms: Query<&mut Transform>,
-    mut highlight_q: Query<(Entity, &HighlightSquare)>,
+    mut highlight_q: Query<(Entity, &HighlightSquare, Without<Marker>)>,
 ) {
     let window = windows.get_primary().unwrap();
     let tile_size = window.width() / 8.;
@@ -365,6 +390,8 @@ fn move_piece_system(
                 state.cursor_grid_pos.x, state.cursor_grid_pos.y
             );
 
+    
+
             let hl = highlight_q.single_mut();
             ev_drop.send(PieceDropEvent(hl.0));
             state.sprite = None;
@@ -387,7 +414,10 @@ fn move_piece_system(
             let diff = cursor_to_sprite_diff(&state.cursor_pos, &sprite_pos);
             let sprite_size = sprite
                 .custom_size
-                .unwrap_or_else(|| Vec2::new(tile_size, tile_size));
+                .unwrap_or_else(|| Vec2::new(
+                    tile_size,
+                    tile_size
+                ));
             if diff.length() < (sprite_size.x / 2.0) {
                 state.sprite = Some((entity, diff));
                 info!(
@@ -431,7 +461,7 @@ fn delete_piece(
         };
     };
 
-    if mouse_button_input.just_pressed(MouseButton::Middle) {
+    if mouse_button_input.just_pressed(MouseButton::Left) {
         for (ent, piece) in pieces.iter() {
             if piece.pos == state.cursor_grid_pos {
                 warn!("Piece deleted at: ({}, {})", piece.pos.x, piece.pos.y);
@@ -465,7 +495,7 @@ fn marker_system(
         commands
             .spawn_bundle(SpriteBundle {
                 sprite: Sprite {
-                    color: HIGHLIGHT,
+                    color: MARKER,
                     ..default()
                 },
                 ..default()
@@ -493,7 +523,19 @@ fn draw_highlight(mut commands: Commands, mut ev_draw_highlight: EventReader<Pie
     }
 }
 
-fn erase_highlight(mut commands: Commands, mut ev_drop: EventReader<PieceDropEvent>) {
+fn erase_highlight(
+    mut commands: Commands,
+    mut ev_drop: EventReader<PieceDropEvent>,
+    mouse_button_input: Res<Input<MouseButton>>,
+    marker_q: Query<(Entity, &HighlightSquare, With<Marker>)>
+    
+) {
+    if mouse_button_input.pressed(MouseButton::Left) {
+        for (marker, _highlight, _is_marker) in marker_q.iter() {
+            commands.entity(marker).despawn();
+        } 
+    }
+    
     for ev in ev_drop.iter() {
         commands.entity(ev.0).despawn();
     }
@@ -508,6 +550,119 @@ fn delete_piece_listener(
     }
 }
 
+fn change_menu(
+    mut commands: Commands,
+    kbd: Res<Input<KeyCode>>,
+    btn: Res<Input<MouseButton>>,
+) {
+    // Non-piece options
+    if (kbd.just_pressed(KeyCode::Key1) ^ kbd.just_pressed(KeyCode::Numpad1)) && !(btn.pressed(MouseButton::Left)) {
+        commands.insert_resource(NextState(CursorState::DragDrop));
+    }
+    if (kbd.just_pressed(KeyCode::Key0) ^ kbd.just_pressed(KeyCode::Numpad0)) && !(btn.pressed(MouseButton::Left)) {
+        commands.insert_resource(NextState(CursorState::Trash));
+    }
+    // if (kbd.just_pressed(KeyCode::Key9) ^ kbd.just_pressed(KeyCode::Numpad9)) && !(btn.pressed(MouseButton::Left)) {
+    //     commands.insert_resource(NextState(CursorState::ChangeArmy));
+    // }
+
+    // Piece-placing options
+
+    if (kbd.just_pressed(KeyCode::Key2) ^ kbd.just_pressed(KeyCode::Numpad2)) && !(btn.pressed(MouseButton::Left)) {
+        commands.insert_resource(NextState(CursorState::Place(PieceCursor::King)));
+    }
+    if (kbd.just_pressed(KeyCode::Key3) ^ kbd.just_pressed(KeyCode::Numpad3)) && !(btn.pressed(MouseButton::Left)) {
+        commands.insert_resource(NextState(CursorState::Place(PieceCursor::Queen)));
+    }
+    if (kbd.just_pressed(KeyCode::Key4) ^ kbd.just_pressed(KeyCode::Numpad4)) && !(btn.pressed(MouseButton::Left)) {
+        commands.insert_resource(NextState(CursorState::Place(PieceCursor::Rook)));
+    }
+    if (kbd.just_pressed(KeyCode::Key5) ^ kbd.just_pressed(KeyCode::Numpad5)) && !(btn.pressed(MouseButton::Left)) {
+        commands.insert_resource(NextState(CursorState::Place(PieceCursor::Bishop)));
+    }
+    if (kbd.just_pressed(KeyCode::Key6) ^ kbd.just_pressed(KeyCode::Numpad6)) && !(btn.pressed(MouseButton::Left)) {
+        commands.insert_resource(NextState(CursorState::Place(PieceCursor::Knight)));
+    }
+    if (kbd.just_pressed(KeyCode::Key7) ^ kbd.just_pressed(KeyCode::Numpad7)) && !(btn.pressed(MouseButton::Left)) {
+        commands.insert_resource(NextState(CursorState::Place(PieceCursor::Pawn)));
+    }
+
+
+}
+
+fn debug_current_state(state: Res<CurrentState<CursorState>>) {
+    if state.is_changed() {
+        println!("Detected state change to {:?}!", state);
+    }
+}
+
+fn draw_piece(
+    mut commands: Commands,
+    cursor_state: Res<CurrentState<CursorState>>,
+    asset_server: Res<AssetServer>,
+    mut state: Local<CursorPos>,
+    windows: Res<Windows>,
+    mut cursor_moved_event_reader: EventReader<CursorMoved>,
+    mouse_button_input: Res<Input<MouseButton>>,
+
+) {
+    let window = windows.get_primary().unwrap();
+    let tile_size = window.width() / 8.;
+    let half_window = Vec2::new(window.width() / 2., window.height() / 2.);
+    if let Some(cursor_ev) = cursor_moved_event_reader.iter().last() {
+        state.cursor_pos = cursor_ev.position - half_window;
+        state.cursor_grid_pos = Position {
+            x: (cursor_ev.position.x / tile_size) as i32,
+            y: (cursor_ev.position.y / tile_size) as i32,
+        };        
+    };
+   
+
+    if mouse_button_input.just_pressed(MouseButton::Left) {
+        commands
+            .spawn_bundle(SpriteBundle {
+                texture: draw_piece_match(cursor_state, asset_server),
+                transform: Transform {
+                    translation: Vec3::new(
+                        convert(state.cursor_grid_pos.x as f32, window.width() as f32, 8f32),
+                        convert(state.cursor_grid_pos.y as f32, window.height() as f32, 8f32),
+                        2.0,
+                    ),
+                    ..default()
+                },
+                ..default()
+            })
+            .insert(Piece {
+                pos: Position { x: state.cursor_grid_pos.x, y: state.cursor_grid_pos.y },
+            })
+            .insert(Position { x: state.cursor_grid_pos.x, y: state.cursor_grid_pos.y })
+            .insert(PieceSize::size(0.67));
+
+            info!(
+                "Cursor position: ({}. {})", 
+                state.cursor_pos.x,
+                state.cursor_pos.y
+            );
+    }
+
+}
+
+fn draw_piece_match(
+    state: Res<CurrentState<CursorState>>,
+    asset_server: Res<AssetServer>,
+) -> Handle<Image> {
+    match state.0 {
+        CursorState::Place(PieceCursor::King) => asset_server.load("pieces\\C_Kw.png"),
+        CursorState::Place(PieceCursor::Queen) => asset_server.load("pieces\\C_Qw.png"),
+        CursorState::Place(PieceCursor::Rook) => asset_server.load("pieces\\C_Rw.png"),
+        CursorState::Place(PieceCursor::Bishop) => asset_server.load("pieces\\C_Bw.png"),
+        CursorState::Place(PieceCursor::Knight) => asset_server.load("pieces\\C_Nw.png"),
+        CursorState::Place(PieceCursor::Pawn) | _ => asset_server.load("pieces\\C_Pw.png"),
+    }
+}
+
+
+
 pub struct BoardPlugin;
 impl Plugin for BoardPlugin {
     fn build(&self, app: &mut App) {
@@ -517,7 +672,7 @@ impl Plugin for BoardPlugin {
                 .with_system(setup_board.before(draw_midline).before(draw_notation))
                 .with_system(draw_midline.before(draw_notation).after(setup_board))
                 .with_system(draw_notation.after(setup_board).after(draw_midline))
-                .with_system(draw_piece_dummy.after(draw_notation)),
+                .with_system(draw_piece_setup.after(draw_notation)),
         )
         .add_startup_system_set_to_stage(
             StartupStage::Startup,
@@ -525,21 +680,80 @@ impl Plugin for BoardPlugin {
                 //.with_system(size_scaling.before(position_translation))
                 .with_system(position_translation)
                 .with_system(piece_position_translation.after(position_translation))
-                .with_system(piece_size_scaling.after(piece_position_translation)),
         )
         .add_system_set_to_stage(
             CoreStage::PostUpdate,
             SystemSet::new()
                 .with_system(notation_position_translation)
-                .with_system(move_piece_system)
-                .with_system(delete_piece.after(move_piece_system))
-                .with_system(delete_piece_listener.after(delete_piece))
-                .with_system(draw_highlight.before(highlight_position_translation))
                 .with_system(highlight_position_translation.before(size_scaling))
-                .with_system(erase_highlight.after(highlight_position_translation))
-                .with_system(size_scaling)
-                .with_system(marker_system),
+                .with_system(size_scaling.after(piece_size_scaling))
+                .with_system(piece_size_scaling)
+                .with_system(erase_highlight),
         )
+        .add_loopless_state(CursorState::DragDrop)
+        .add_system_set(
+            ConditionSet::new()
+                .run_in_state(CursorState::DragDrop)
+                .with_system(move_piece_system)
+                .with_system(draw_highlight)
+
+                .with_system(marker_system)
+                .with_system(change_menu)
+                .into()
+        )
+        .add_system_set(
+            ConditionSet::new()
+                .run_in_state(CursorState::Trash)
+                .with_system(delete_piece)
+                .with_system(delete_piece_listener)
+                .with_system(change_menu)
+                .into()
+        )
+        .add_system_set(
+            ConditionSet::new()
+                .run_in_state(CursorState::Place(PieceCursor::King))
+                .with_system(draw_piece)
+                .with_system(change_menu)
+                .into()
+        )
+        .add_system_set(
+            ConditionSet::new()
+                .run_in_state(CursorState::Place(PieceCursor::Queen))
+                .with_system(draw_piece)
+                .with_system(change_menu)
+                .into()
+        )
+        .add_system_set(
+            ConditionSet::new()
+                .run_in_state(CursorState::Place(PieceCursor::Rook))
+                .with_system(draw_piece)
+                .with_system(change_menu)
+                .into()
+        )
+        .add_system_set(
+            ConditionSet::new()
+                .run_in_state(CursorState::Place(PieceCursor::Bishop))
+                .with_system(draw_piece)
+                .with_system(change_menu)
+                .into()
+        )
+        .add_system_set(
+            ConditionSet::new()
+                .run_in_state(CursorState::Place(PieceCursor::Knight))
+                .with_system(draw_piece)
+                .with_system(change_menu)
+                .into()
+        )
+        .add_system_set(
+            ConditionSet::new()
+                .run_in_state(CursorState::Place(PieceCursor::Pawn))
+                .with_system(draw_piece)
+                .with_system(size_scaling)
+                .with_system(change_menu)
+                .into()
+        )
+        .add_system(debug_current_state)
+
         .add_event::<PieceDragEvent>()
         .add_event::<PieceDropEvent>()
         .add_event::<DrawPieceEvent>()

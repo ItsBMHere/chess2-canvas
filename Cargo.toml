@@ -15,7 +15,7 @@ bevy_prototype_lyon = "0.5"
 winit = {version = "0.26"}
 image = {version = "0.24"}
 bevy_svg = { version = "0.7", default-features = false, features = ["2d"] }
-iyes_loopless = { version = "0.5.1"}
+iyes_loopless = { version = "0.6.1"}
 
 [profile.dev.package."*"]
 opt-level = 3
