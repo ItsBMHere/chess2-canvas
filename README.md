@@ -6,6 +6,27 @@ https://user-images.githubusercontent.com/84604651/175427571-1402b468-ea93-46af-
 
 `chess2-canvas` is an in-progress board editor for David Sirlin's [Chess 2: The Sequel](https://en.wikipedia.org/wiki/Chess_2:_The_Sequel) and built using the [Bevy game engine](https://bevyengine.org/). It can be used to show off board positions, or play correspondence games (although no rules are implemented).
 
+# Usage
+---
+At current time of writing (June 24th 2022), all commands are handled via the keyboard. This utility is at a very early stage - the bare minimum functionality is all there, but there's lots of developments to look foward to. 
+
+For now, here are the keyboard commands - if you have ever used [Lichess' board editor](https://lichess.org/editor) then this should feel somewhat familiar:
+
+- **1**: 'Selection' mode - *drag* pieces around by left-clicking and holding; let go to *drop* them on a new square. You can highlight any square on the board in this mode by right-clicking it, but these will disappear as soon as you left-click.
+- **2**: Draw King over hovered square
+- **3**: Draw Queen
+- **4**: Draw Rook
+- **5**: Draw Bishop
+- **6**: Draw Knight
+- **7**: Draw Pawn
+- **0**: Delete piece over hovered square.
+- **Spacebar**: Toggle between drawing White and Black pieces.
+- **A/D**: Cycle through the 6 armies, in the order of: 1) Classic, 2) Nemesis, 3) Empowered, 4) Reaper, 5) Two Kings, 6) Animals. 
+I won't explain what all these new pieces do - the [rulebook](https://static1.squarespace.com/static/575f8cb8ab48de461197681a/t/5f2e3acc0fe05d162d2c0834/1596865230951/chess2_rulebook3-0.pdf) does a perfectly good job of introducing them.
+- **Ctrl + S**: Save a screenshot of the board configuration to the project directory.
+
+
+
 # Problem Decomposition
 ---
 
