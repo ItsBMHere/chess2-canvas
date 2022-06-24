@@ -27,19 +27,10 @@ https://user-images.githubusercontent.com/84604651/175427571-1402b468-ea93-46af-
 	- [ ] Draw arrow between right-clicked square and hovered-over square when right mouse pressed, held, & dragged
 	- [ ] Erase arrows on left mouse press
 	- [x] Erase circles on left mouse press
-<<<<<<< HEAD
 - [x] 'Pieces' mode
 	- [x] Draw Piece on hovered-over square on left mouse press
 	- [x] Overwrite piece on hovered-over square on left mouse press with new piece
 	- [x] Cycle through different armies with A/D keys
-=======
-- [ ] 'Pieces' mode
-	- [x] Draw Piece on hovered-over square on left mouse press
-	- [ ] Overwrite piece on hovered-over square on left mouse press with new piece
-	- [ ] Cycle through different armies with A/D keys
->>>>>>> 6f00c3081c2d45785b1f8976853daddff522004b
-		- [ ] Overwrite pieces from old army with new army
-	- [x] Cycle through piece to place with 1/2/3/4/5/6
 - [x] 'Trash' mode
 	- [x] Erase piece on hovered-over square on left mouse press
 	(OK - this one is a bit tenuous at the moment...)
