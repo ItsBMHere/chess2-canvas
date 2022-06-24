@@ -1,7 +1,9 @@
 # About
 ---
 
-https://user-images.githubusercontent.com/84604651/175427571-1402b468-ea93-46af-b223-f3be14cb71f7.mp4
+
+https://user-images.githubusercontent.com/84604651/175720647-803cc54a-555a-4fa5-9e24-7162edb85edf.mp4
+
 
 
 `chess2-canvas` is an in-progress board editor for David Sirlin's [Chess 2: The Sequel](https://en.wikipedia.org/wiki/Chess_2:_The_Sequel) and built using the [Bevy game engine](https://bevyengine.org/). It can be used to show off board positions, or play correspondence games (although no rules are implemented).
