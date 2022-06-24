@@ -1,7 +1,8 @@
 use bevy::prelude::*;
 use iyes_loopless::prelude::*;
-use bevy::window::CursorMoved;
+use bevy::window::{CursorIcon, CursorMoved};
 use bevy_inspector_egui::{Inspectable, RegisterInspectable, WorldInspectorPlugin};
+use super::screenshot::take_screenshot;
 
 // A square on the board.
 #[derive(Component)]
@@ -99,6 +100,22 @@ enum CursorState {
     DragDrop,
     Trash,
     Place(PieceCursor),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum ArmyStates {
+    Classic,
+    Nemesis,
+    Empowered,
+    Reaper,
+    TwoKings,
+    Animals
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum PieceColor {
+    White,
+    Black,
 }
 
 
@@ -212,7 +229,7 @@ fn draw_piece_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     for x in 0..8 {
         commands
             .spawn_bundle(SpriteBundle {
-                texture: asset_server.load("pieces\\n_p.png"),
+                texture: asset_server.load("pieces\\nemesis\\p.png"),
                 ..default()
             })
             .insert(Piece {
@@ -223,7 +240,7 @@ fn draw_piece_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 
         commands
             .spawn_bundle(SpriteBundle {
-                texture: asset_server.load("pieces\\C_Pw.png"),
+                texture: asset_server.load("pieces\\classic\\p_w.png"),
                 ..default()
             })
             .insert(Piece {
@@ -357,9 +374,11 @@ fn move_piece_system(
     mut cursor_moved_event_reader: EventReader<CursorMoved>,
     mouse_button_input: Res<Input<MouseButton>>,
     mut sprites: Query<(Entity, &Sprite, With<PieceSize>)>,
-    mut pieces: Query<&mut Piece>,
+    mut pieces: Query<(Entity, &mut Piece)>,
     mut transforms: Query<&mut Transform>,
     mut highlight_q: Query<(Entity, &HighlightSquare, Without<Marker>)>,
+    mut ev_delete: EventWriter<DeletePieceEvent>,
+    mut is_holding_piece: Local<bool>, // Checks for held pieces when mouse pressed/released - prevents piece deletion via accidental empty-dragging
 ) {
     let window = windows.get_primary().unwrap();
     let tile_size = window.width() / 8.;
@@ -373,6 +392,17 @@ fn move_piece_system(
     };
 
     if mouse_button_input.just_released(MouseButton::Left) {
+        if *is_holding_piece {
+            for (ent, piece) in pieces.iter() {
+                if piece.pos == state.cursor_grid_pos {
+                    warn!("Piece deleted at: ({}, {})", piece.pos.x, piece.pos.y);
+                    ev_delete.send(DeletePieceEvent(ent));
+                }
+            }
+        }
+
+
+
         if let Some(sprite) = state.sprite {
             let mut sprite_pos = transforms.get_mut(sprite.0).unwrap();
             let mut piece_internal = pieces.get_mut(sprite.0).unwrap();
@@ -382,8 +412,8 @@ fn move_piece_system(
                 2.0,
             );
 
-            piece_internal.pos.x = state.cursor_grid_pos.x;
-            piece_internal.pos.y = state.cursor_grid_pos.y;
+            piece_internal.1.pos.x = state.cursor_grid_pos.x;
+            piece_internal.1.pos.y = state.cursor_grid_pos.y;
 
             info!(
                 "Piece position on grid: ({}, {})",
@@ -395,11 +425,15 @@ fn move_piece_system(
             let hl = highlight_q.single_mut();
             ev_drop.send(PieceDropEvent(hl.0));
             state.sprite = None;
+            *is_holding_piece = false;
             return;
         }
     }
     if mouse_button_input.pressed(MouseButton::Left) && state.sprite.is_some() {
         let sprite = state.sprite.unwrap();
+        let mut piece_internal = pieces.get_mut(sprite.0).unwrap();
+        piece_internal.1.pos.x = -1;
+        piece_internal.1.pos.y = -1;
 
         let mut sprite_pos = transforms.get_mut(sprite.0).unwrap();
 
@@ -424,6 +458,7 @@ fn move_piece_system(
                     "Piece picked up on: ({}, {})",
                     state.cursor_grid_pos.x, state.cursor_grid_pos.y
                 );
+                *is_holding_piece = true;
                 ev_drag.send(PieceDragEvent(entity, state.cursor_grid_pos));
             }
         }
@@ -555,9 +590,10 @@ fn change_menu(
     kbd: Res<Input<KeyCode>>,
     btn: Res<Input<MouseButton>>,
 ) {
+
     // Non-piece options
     if (kbd.just_pressed(KeyCode::Key1) ^ kbd.just_pressed(KeyCode::Numpad1)) && !(btn.pressed(MouseButton::Left)) {
-        commands.insert_resource(NextState(CursorState::DragDrop));
+        commands.insert_resource(NextState(CursorState::DragDrop));        
     }
     if (kbd.just_pressed(KeyCode::Key0) ^ kbd.just_pressed(KeyCode::Numpad0)) && !(btn.pressed(MouseButton::Left)) {
         commands.insert_resource(NextState(CursorState::Trash));
@@ -590,19 +626,87 @@ fn change_menu(
 
 }
 
+/// Change the colour of pieces to draw when the spacebar is pressed.
+/// I could use a bool to toggle this, but handling this feature via an enum keeps it in line with the other 'change' functions.
+fn change_drawable_color(
+    mut commands: Commands, 
+    kbd: Res<Input<KeyCode>>,
+    mut index: Local<usize>,
+) {
+    const COLOR: &[PieceColor] = &[
+        PieceColor::White,
+        PieceColor::Black,
+    ];
+
+    if kbd.just_pressed(KeyCode::Space) {
+        *index = if *index == 0 {
+            COLOR.len() - 1
+        } else {
+            *index - 1
+        };
+        commands.insert_resource(NextState(COLOR[*index]));
+    }
+}
+
+fn change_armies(
+    mut commands: Commands, 
+    kbd: Res<Input<KeyCode>>,
+    mut index: Local<usize>,
+) {
+    const ARMIES: &[ArmyStates] = &[
+        ArmyStates::Classic,
+        ArmyStates::Nemesis,
+        ArmyStates::Empowered,
+        ArmyStates::Reaper,
+        ArmyStates::TwoKings,
+        ArmyStates::Animals,
+    ];
+
+    if (kbd.just_pressed(KeyCode::A) || kbd.just_pressed(KeyCode::Left)) && !(kbd.just_pressed(KeyCode::D)) {
+        *index = if *index == 0 {
+            ARMIES.len() - 1
+        } else {
+            *index - 1
+        };
+        commands.insert_resource(NextState(ARMIES[*index]));
+    }
+
+    if (kbd.just_pressed(KeyCode::D) || kbd.just_pressed(KeyCode::Right)) && !(kbd.just_pressed(KeyCode::A) || kbd.just_pressed(KeyCode::Left)) {
+        *index = (*index + 1) % ARMIES.len();
+        commands.insert_resource(NextState(ARMIES[*index]));
+    }
+
+}
+
+fn debug_current_army(state: Res<CurrentState<ArmyStates>>) {
+    if state.is_changed() {
+        info!("Current army is: {:?}", state);
+    }
+}
+
 fn debug_current_state(state: Res<CurrentState<CursorState>>) {
     if state.is_changed() {
         println!("Detected state change to {:?}!", state);
     }
 }
 
+fn debug_current_drawable_color(state: Res<CurrentState<PieceColor>>) {
+    if state.is_changed() {
+        println!("Colour to draw is: {:?}!", state);
+    }
+}
+
 fn draw_piece(
     mut commands: Commands,
     cursor_state: Res<CurrentState<CursorState>>,
+    army_state: Res<CurrentState<ArmyStates>>,
+    color_state: Res<CurrentState<PieceColor>>,
     asset_server: Res<AssetServer>,
     mut state: Local<CursorPos>,
     windows: Res<Windows>,
+    occupied_squares: Query<(Entity, &Piece)>,
     mut cursor_moved_event_reader: EventReader<CursorMoved>,
+    mut ev_overwrite: EventWriter<DeletePieceEvent>,
     mouse_button_input: Res<Input<MouseButton>>,
 
 ) {
@@ -619,9 +723,16 @@ fn draw_piece(
    
 
     if mouse_button_input.just_pressed(MouseButton::Left) {
+        for (ent, piece) in occupied_squares.iter() {
+            if piece.pos == state.cursor_grid_pos {
+                warn!("Overwriting piece in position ({}, {})", piece.pos.x, piece.pos.y);
+                ev_overwrite.send(DeletePieceEvent(ent));
+            }
+        }
+
         commands
             .spawn_bundle(SpriteBundle {
-                texture: draw_piece_match(cursor_state, asset_server),
+                texture: draw_piece_match(army_state, color_state, cursor_state, asset_server),
                 transform: Transform {
                     translation: Vec3::new(
                         convert(state.cursor_grid_pos.x as f32, window.width() as f32, 8f32),
@@ -647,21 +758,47 @@ fn draw_piece(
 
 }
 
+#[inline(always)]
+fn get_piece_filename(
+    army_state: &Res<CurrentState<ArmyStates>>,
+    color_state: &Res<CurrentState<PieceColor>>,
+    piece_letter: &str
+) -> String {
+    format!(
+        "pieces\\{}\\{}{}.png",
+        match army_state.0 {
+            ArmyStates::Classic => "classic",
+            ArmyStates::Nemesis => "nemesis",
+            ArmyStates::Empowered => "empowered",
+            ArmyStates::Reaper => "reaper",
+            ArmyStates::TwoKings => "twoKings",
+            ArmyStates::Animals => "animals",
+        },
+        piece_letter,
+        match color_state.0 {
+            PieceColor::White => "_w",
+            PieceColor::Black => "",
+        }
+    )
+
+}
+
 fn draw_piece_match(
+    army_state: Res<CurrentState<ArmyStates>>,
+    color_state: Res<CurrentState<PieceColor>>,
     state: Res<CurrentState<CursorState>>,
     asset_server: Res<AssetServer>,
 ) -> Handle<Image> {
+
     match state.0 {
-        CursorState::Place(PieceCursor::King) => asset_server.load("pieces\\C_Kw.png"),
-        CursorState::Place(PieceCursor::Queen) => asset_server.load("pieces\\C_Qw.png"),
-        CursorState::Place(PieceCursor::Rook) => asset_server.load("pieces\\C_Rw.png"),
-        CursorState::Place(PieceCursor::Bishop) => asset_server.load("pieces\\C_Bw.png"),
-        CursorState::Place(PieceCursor::Knight) => asset_server.load("pieces\\C_Nw.png"),
-        CursorState::Place(PieceCursor::Pawn) | _ => asset_server.load("pieces\\C_Pw.png"),
+        CursorState::Place(PieceCursor::King) => asset_server.load(&get_piece_filename(&army_state, &color_state, "k")),
+        CursorState::Place(PieceCursor::Queen) => asset_server.load(&get_piece_filename(&army_state, &color_state, "q")),
+        CursorState::Place(PieceCursor::Rook) => asset_server.load(&get_piece_filename(&army_state, &color_state, "r")),
+        CursorState::Place(PieceCursor::Bishop) => asset_server.load(&get_piece_filename(&army_state, &color_state, "b")),
+        CursorState::Place(PieceCursor::Knight) => asset_server.load(&get_piece_filename(&army_state, &color_state, "n")),
+        CursorState::Place(PieceCursor::Pawn) | _ => asset_server.load(&get_piece_filename(&army_state, &color_state, "p")),
     }
 }
-
-
 
 pub struct BoardPlugin;
 impl Plugin for BoardPlugin {
@@ -688,15 +825,20 @@ impl Plugin for BoardPlugin {
                 .with_system(highlight_position_translation.before(size_scaling))
                 .with_system(size_scaling.after(piece_size_scaling))
                 .with_system(piece_size_scaling)
-                .with_system(erase_highlight),
+                .with_system(erase_highlight)
+                .with_system(change_armies),
         )
         .add_loopless_state(CursorState::DragDrop)
+        .add_loopless_state(ArmyStates::Classic)
+        .add_loopless_state(PieceColor::White)
         .add_system_set(
             ConditionSet::new()
                 .run_in_state(CursorState::DragDrop)
                 .with_system(move_piece_system)
+                .with_system(delete_piece_listener)
+                .with_system(change_drawable_color)
                 .with_system(draw_highlight)
-
+                // .with_system(change_armies)
                 .with_system(marker_system)
                 .with_system(change_menu)
                 .into()
@@ -707,6 +849,7 @@ impl Plugin for BoardPlugin {
                 .with_system(delete_piece)
                 .with_system(delete_piece_listener)
                 .with_system(change_menu)
+                .with_system(change_drawable_color)
                 .into()
         )
         .add_system_set(
@@ -714,6 +857,8 @@ impl Plugin for BoardPlugin {
                 .run_in_state(CursorState::Place(PieceCursor::King))
                 .with_system(draw_piece)
                 .with_system(change_menu)
+                .with_system(change_drawable_color)
+                .with_system(delete_piece_listener)
                 .into()
         )
         .add_system_set(
@@ -721,6 +866,8 @@ impl Plugin for BoardPlugin {
                 .run_in_state(CursorState::Place(PieceCursor::Queen))
                 .with_system(draw_piece)
                 .with_system(change_menu)
+                .with_system(change_drawable_color)
+                .with_system(delete_piece_listener)
                 .into()
         )
         .add_system_set(
@@ -728,6 +875,8 @@ impl Plugin for BoardPlugin {
                 .run_in_state(CursorState::Place(PieceCursor::Rook))
                 .with_system(draw_piece)
                 .with_system(change_menu)
+                .with_system(change_drawable_color)
+                .with_system(delete_piece_listener)
                 .into()
         )
         .add_system_set(
@@ -735,6 +884,8 @@ impl Plugin for BoardPlugin {
                 .run_in_state(CursorState::Place(PieceCursor::Bishop))
                 .with_system(draw_piece)
                 .with_system(change_menu)
+                .with_system(change_drawable_color)
+                .with_system(delete_piece_listener)
                 .into()
         )
         .add_system_set(
@@ -742,6 +893,8 @@ impl Plugin for BoardPlugin {
                 .run_in_state(CursorState::Place(PieceCursor::Knight))
                 .with_system(draw_piece)
                 .with_system(change_menu)
+                .with_system(change_drawable_color)
+                .with_system(delete_piece_listener)
                 .into()
         )
         .add_system_set(
@@ -750,16 +903,22 @@ impl Plugin for BoardPlugin {
                 .with_system(draw_piece)
                 .with_system(size_scaling)
                 .with_system(change_menu)
+                .with_system(change_drawable_color)
+                .with_system(delete_piece_listener)
                 .into()
         )
         .add_system(debug_current_state)
+        .add_system(debug_current_army)
+        .add_system(debug_current_drawable_color)
+        .add_system(take_screenshot)
+  
 
         .add_event::<PieceDragEvent>()
         .add_event::<PieceDropEvent>()
         .add_event::<DrawPieceEvent>()
         .add_event::<DeletePieceEvent>()
-        .add_plugin(WorldInspectorPlugin::new())
-        .register_inspectable::<Position>()
+        //.add_plugin(WorldInspectorPlugin::new())
+        //.register_inspectable::<Position>()
         .run();
     }
 }
